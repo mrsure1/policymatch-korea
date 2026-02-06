@@ -32,7 +32,7 @@ async def run_scraping():
     print("="*60 + "\n")
     
     from main import main as scrape_main
-    await scrape_main()
+    scrape_main()
     print("\n✅ 스크래핑 완료!\n")
 
 
