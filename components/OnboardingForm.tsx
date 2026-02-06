@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useUserProfileStore } from '@/lib/store';
 import { ChevronRight, Building2, User, MapPin, Briefcase, Calendar, Sparkles, TrendingUp, FileText } from 'lucide-react';
 
@@ -84,20 +85,59 @@ export default function OnboardingForm() {
                             </div>
                         </div>
 
-                        <button
-                            onClick={handleNext}
-                            className="w-full px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-bold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
-                        >
-                            시작하기
-                            <ChevronRight className="w-5 h-5" />
-                        </button>
-                        <p className="text-xs text-slate-500 mt-3">소요시간: 약 1분</p>
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={handleNext}
+                                className="w-full px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-bold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
+                            >
+                                시작하기
+                                <ChevronRight className="w-5 h-5" />
+                            </button>
+                            <Link
+                                href="/archive"
+                                className="text-sm text-slate-500 hover:text-blue-600 underline decoration-slate-300 underline-offset-4 transition-colors"
+                            >
+                                전체 공고 모아보기 (자료실)
+                            </Link>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-2">소요시간: 약 1분</p>
                     </div>
                 )}
 
                 {/* Question Steps - 1 to 5 */}
                 {step > 0 && (
                     <div className="bg-white rounded-3xl shadow-2xl p-8 animate-fade-in">
+                        {/* Selection History */}
+                        {step > 1 && (
+                            <div className="mb-6 flex flex-wrap gap-2 animate-fade-in">
+                                <span className="text-xs font-semibold text-slate-500 flex items-center mr-1">선택 내역:</span>
+                                {step > 1 && profile.entityType && (
+                                    <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100 flex items-center">
+                                        <Building2 className="w-3 h-3 mr-1.5" />
+                                        {profile.entityType}
+                                    </div>
+                                )}
+                                {step > 2 && profile.age && (
+                                    <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100 flex items-center">
+                                        <User className="w-3 h-3 mr-1.5" />
+                                        {profile.age}
+                                    </div>
+                                )}
+                                {step > 3 && profile.region && (
+                                    <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100 flex items-center">
+                                        <MapPin className="w-3 h-3 mr-1.5" />
+                                        {profile.region}
+                                    </div>
+                                )}
+                                {step > 4 && profile.industry && (
+                                    <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100 flex items-center">
+                                        <Briefcase className="w-3 h-3 mr-1.5" />
+                                        {profile.industry}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Progress Bar */}
                         <div className="mb-8">
                             <div className="flex justify-between items-center mb-3">
@@ -185,17 +225,17 @@ export default function OnboardingForm() {
                                             <p className="text-slate-600 mt-1">사업장이 위치한 지역을 선택해주세요</p>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mt-6">
                                         {REGIONS.map((region) => (
                                             <button
                                                 key={region}
                                                 onClick={() => updateProfile({ region })}
-                                                className={`p-4 rounded-xl border-2 text-center transition-all transform hover:scale-105 ${profile.region === region
+                                                className={`p-3 rounded-xl border-2 text-center transition-all transform hover:scale-105 ${profile.region === region
                                                     ? 'border-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md'
                                                     : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
                                                     }`}
                                             >
-                                                <span className="font-bold text-slate-900">{region}</span>
+                                                <span className="text-sm font-bold text-slate-900">{region}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -213,7 +253,7 @@ export default function OnboardingForm() {
                                             <p className="text-slate-600 mt-1">주요 업종을 선택해주세요</p>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4 mt-6">
+                                    <div className="grid grid-cols-2 gap-4 mt-6 max-h-[280px] overflow-y-auto pr-2">
                                         {INDUSTRIES.map((industry) => (
                                             <button
                                                 key={industry}
@@ -241,7 +281,7 @@ export default function OnboardingForm() {
                                             <p className="text-slate-600 mt-1">사업을 시작한 지 얼마나 되셨나요?</p>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-1 gap-4 mt-6">
+                                    <div className="grid grid-cols-1 gap-4 mt-6 max-h-[280px] overflow-y-auto pr-2">
                                         {BUSINESS_PERIODS.map((period) => (
                                             <button
                                                 key={period}

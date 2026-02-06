@@ -40,18 +40,18 @@ export default function PolicyCard({ policy }: PolicyCardProps) {
                 <div className="flex items-center gap-4 text-sm">
                     <div className="flex items-center gap-1 text-blue-600">
                         <TrendingUp className="w-4 h-4" />
-                        <span className="font-semibold">{policy.supportAmount}</span>
+                        <span className="font-semibold">{policy.supportAmount || '미정'}</span>
                     </div>
                     <div className="flex items-center gap-1 text-slate-600">
                         <Clock className="w-4 h-4" />
-                        <span>{policy.applicationPeriod.split('~')[0].trim()}</span>
+                        <span>{policy.applicationPeriod ? policy.applicationPeriod.split('~')[0].trim() : '상시'}</span>
                     </div>
                 </div>
 
                 {/* CTA */}
                 <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
                     <span className="text-sm text-slate-600">
-                        로드맵 {policy.roadmap.length}단계 • 서류 {policy.documents.length}개
+                        로드맵 {policy.roadmap?.length || 0}단계 • 서류 {policy.documents?.length || 0}개
                     </span>
                     <ExternalLink className="w-4 h-4 text-blue-600" />
                 </div>

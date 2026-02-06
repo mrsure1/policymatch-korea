@@ -28,6 +28,9 @@ export interface Policy {
     dDay: number;
     applicationPeriod: string;
     agency: string;
+    url?: string;
+    mobileUrl?: string;
+    detailContent?: string;
 
     // Matching criteria
     criteria: {
@@ -538,7 +541,7 @@ export const mockPolicies: Policy[] = [
         summary: '혁신적인 기술창업 아이디어를 보유한 예비창업자의 창업 사업화 준비단계를 지원하여 성공적인 창업시장 안착 유도. 사업화 자금 최대 1억원 지원.',
         supportAmount: '최대 1억원',
         dDay: 30,
-        applicationPeriod: '2026년 1월 예정',
+        applicationPeriod: '2026년 3월 예정',
         agency: '중소벤처기업부 (창업진흥원)',
         criteria: {
             entityTypes: ['예비창업자'],
@@ -551,7 +554,7 @@ export const mockPolicies: Policy[] = [
             {
                 step: 1,
                 title: '사업 공고 확인',
-                description: 'K-Startup 홈페이지를 통해 2026년 1월 공고 확인',
+                description: 'K-Startup 홈페이지를 통해 2026년 3월 공고 확인',
                 estimatedDays: 1,
             },
             {
@@ -569,7 +572,7 @@ export const mockPolicies: Policy[] = [
         summary: '유망 창업 아이템 및 기술을 보유한 초기 창업기업(3년 이내)의 사업화 지원을 통한 안정적인 시장 진입 및 성장 도모.',
         supportAmount: '최대 1억원',
         dDay: 30,
-        applicationPeriod: '2025년 12월 ~ 2026년 1월',
+        applicationPeriod: '2026년 2월 ~ 2026년 3월',
         agency: '중소벤처기업부 (창업진흥원)',
         criteria: {
             entityTypes: ['소상공인', '중소기업'],
@@ -585,7 +588,7 @@ export const mockPolicies: Policy[] = [
         summary: '도약기(3~7년) 기업의 사업모델 및 제품·서비스 고도화에 필요한 사업화 자금 지원으로 스케일업 촉진.',
         supportAmount: '최대 3억원',
         dDay: 30,
-        applicationPeriod: '2025년 12월 ~ 2026년 1월',
+        applicationPeriod: '2026년 2월 ~ 2026년 3월',
         agency: '중소벤처기업부 (창업진흥원)',
         criteria: {
             entityTypes: ['중소기업'],
@@ -601,7 +604,7 @@ export const mockPolicies: Policy[] = [
         summary: '청년창업자를 대상으로 창업 전 과정(교육, 코칭, 공간, 자금, 기술 등)을 패키지로 지원.',
         supportAmount: '최대 1억원',
         dDay: 30,
-        applicationPeriod: '2026년 1월',
+        applicationPeriod: '2026년 2월 ~ 2026년 3월',
         agency: '중소벤처기업부 (중진공)',
         criteria: {
             entityTypes: ['예비창업자', '소상공인', '중소기업'],
@@ -617,7 +620,7 @@ export const mockPolicies: Policy[] = [
         summary: '시스템반도체, 바이오·헬스 등 신산업 분야 독보적 기술을 보유한 유망 스타트업 육성.',
         supportAmount: 'R&D 최대 6억 + 사업화 최대 2억',
         dDay: 15,
-        applicationPeriod: '2025년 12월',
+        applicationPeriod: '2026년 2월 말 마감',
         agency: '중소벤처기업부',
         criteria: {
             entityTypes: ['중소기업'],

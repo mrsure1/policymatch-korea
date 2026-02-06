@@ -1,0 +1,29 @@
+# Python 의존성 패키지
+# AI 기반 정책자금 메타데이터 추출 시스템
+
+# AI & API
+google-generativeai>=0.8.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# Database
+supabase>=2.3.0
+
+# HWP 파일 파싱 (향후 구현)
+olefile>=0.47
+
+# 환경 변수 관리
+python-dotenv>=1.0.0
+
+# 비동기 처리
+aiohttp>=3.9.0
+
+# 데이터 처리
+pandas>=2.1.0
+
+# 테스트 (개발용)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# 기타 유틸리티
+tqdm>=4.66.0  # 진행 표시줄

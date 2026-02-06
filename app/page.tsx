@@ -1,22 +1,20 @@
 'use client';
 
+import Link from 'next/link';
 import { useUserProfileStore } from '@/lib/store';
-import { matchPolicies } from '@/lib/mockPolicies';
-import { checkApiStatus } from '@/lib/api/publicDataApi';
+import { usePolicies } from '@/lib/hooks/usePolicies';
 import OnboardingForm from '@/components/OnboardingForm';
 import PolicyCard from '@/components/PolicyCard';
 import EditableTag from '@/components/EditableTag';
-import { RefreshCw, User, Info } from 'lucide-react';
+import { RefreshCw, User, Info, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 
 export default function HomePage() {
   const { profile, isOnboardingComplete, resetProfile, updateProfile } = useUserProfileStore();
+  const { policies: matchedPolicies, loading, error, source } = usePolicies(profile);
 
   if (!isOnboardingComplete) {
     return <OnboardingForm />;
   }
-
-  const matchedPolicies = matchPolicies(profile);
-  const apiStatus = checkApiStatus();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100">
@@ -53,16 +51,17 @@ export default function HomePage() {
                     label=""
                     value={profile.entityType}
                     options={['예비창업자', '소상공인', '중소기업']}
-                    onChange={(value) => updateProfile({ entityType: value })}
+                    onChange={(value) => updateProfile({ entityType: value as any })}
                     color="blue"
                   />
                 )}
+                {/* ... other tags unchanged ... */}
                 {profile.age && (
                   <EditableTag
                     label=""
                     value={profile.age}
                     options={['청년 (39세 이하)', '중장년 (40-64세)', '시니어 (65세 이상)']}
-                    onChange={(value) => updateProfile({ age: value })}
+                    onChange={(value) => updateProfile({ age: value as any })}
                   />
                 )}
                 {profile.region && (
@@ -86,7 +85,7 @@ export default function HomePage() {
                     label="사업기간"
                     value={profile.businessPeriod}
                     options={['1년 미만', '1-3년', '3-7년', '7년 이상']}
-                    onChange={(value) => updateProfile({ businessPeriod: value })}
+                    onChange={(value) => updateProfile({ businessPeriod: value as any })}
                   />
                 )}
               </div>
@@ -94,38 +93,44 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* API Status Banner */}
-        <div className={`mb-6 p-4 rounded-xl border-2 flex items-start gap-3 ${apiStatus.configured
-          ? 'bg-green-50 border-green-200'
-          : 'bg-yellow-50 border-yellow-200'
-          }`}>
-          <Info className={`w-5 h-5 flex-shrink-0 mt-0.5 ${apiStatus.configured ? 'text-green-600' : 'text-yellow-600'
-            }`} />
-          <div className="flex-1">
-            <p className={`text-sm font-semibold ${apiStatus.configured ? 'text-green-900' : 'text-yellow-900'
-              }`}>
-              {apiStatus.configured ? '✓ API 연동 완료' : '⚠ 목 데이터 사용 중'}
-            </p>
-            <p className={`text-xs mt-1 ${apiStatus.configured ? 'text-green-700' : 'text-yellow-700'
-              }`}>
-              {apiStatus.configured
-                ? '공공데이터 API가 설정되었습니다. K-Startup API 승인 후 실제 정책자금 데이터를 사용할 수 있습니다.'
-                : '현재 샘플 데이터를 사용하고 있습니다. .env.local 파일에 API 키를 설정해주세요.'}
-            </p>
+        {/* Status/Error Messages */}
+        {error && (
+          <div className="mb-6 p-4 rounded-xl border-2 border-red-200 bg-red-50 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-900">데이터를 불러오지 못했습니다</p>
+              <p className="text-xs text-red-700 mt-1">{error}</p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Results */}
-        <div className="mb-4">
-          <h2 className="text-2xl font-bold text-slate-900">
-            매칭된 정책 <span className="text-blue-600">{matchedPolicies.length}개</span>
-          </h2>
-          <p className="text-slate-600 mt-1">
-            회원님의 프로필과 일치하는 정부 지원 정책입니다
-          </p>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">
+              매칭된 정책 <span className="text-blue-600">{loading ? '...' : matchedPolicies.length}개</span>
+            </h2>
+            <p className="text-slate-600 mt-1">
+              회원님의 프로필과 일치하는 정부 지원 정책입니다
+            </p>
+          </div>
+          <Link
+            href="/archive"
+            className="flex items-center gap-1.5 text-sm font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors"
+          >
+            전체 공고 보러가기
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
-        {matchedPolicies.length > 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+              <p className="text-slate-500 font-semibold">실시간 정책 데이터를 조회하고 있습니다...</p>
+            </div>
+          </div>
+        ) : matchedPolicies.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {matchedPolicies.map((policy) => (
               <PolicyCard key={policy.id} policy={policy} />
@@ -133,8 +138,17 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border-2 border-slate-200 p-12 text-center">
-            <p className="text-slate-600 mb-2">현재 프로필과 일치하는 정책이 없습니다</p>
-            <p className="text-sm text-slate-500">프로필을 다시 설정해보세요</p>
+            {error ? (
+              <>
+                <p className="text-slate-800 font-bold mb-2">API 연결 상태를 확인해주세요</p>
+                <p className="text-sm text-slate-500">잠시 후 다시 시도해주시거나 관리자에게 문의하세요.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-slate-600 mb-2">현재 프로필과 일치하는 정책이 없습니다</p>
+                <p className="text-sm text-slate-500">프로필 조건을 변경해보시거나 나중에 다시 조회해주세요.</p>
+              </>
+            )}
           </div>
         )}
       </div>

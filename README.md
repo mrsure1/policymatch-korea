@@ -214,6 +214,46 @@ export function matchPolicies(profile: UserProfile): Policy[] {
 - 제목: `font-bold`, `text-xl` ~ `text-2xl`
 - 본문: `text-sm` ~ `text-base`
 
+---
+
+## 🤖 AI 정책 분석 시스템
+
+### Gemini AI 자동 메타데이터 추출
+
+**기능**: 정책 공고문을 AI로 분석하여 핵심 정보 자동 추출
+- ✅ 지역, 업종, 지원금액, 대상 등 7가지 메타데이터 자동화
+- ✅ HWP 파일 자동 파싱 (olefile 기반)
+- ✅ Supabase PostgreSQL 자동 저장
+
+### 사용법
+
+```bash
+# Python 의존성 설치
+pip install -r requirements.txt
+
+# 정책 데이터 분석 (API 데이터)
+python scripts/analyze_policies.py --limit 10
+
+# HWP 파일 분석
+python scripts/analyze_policies.py --source hwp
+```
+
+### ⚠️ API 할당량 관리
+
+Gemini API 무료 티어는 **하루 20개 제한**이 있습니다.
+
+- ✅ 자동 Rate Limiting (10초 간격)
+- ✅ 할당량 초과 시 자동 중단
+- 📖 [자세한 가이드](docs/Gemini_API_할당량_가이드.md)
+
+### 관련 문서
+
+- [사용 가이드](docs/사용_가이드.md)
+- [Gemini API 할당량 가이드](docs/Gemini_API_할당량_가이드.md)
+- [Supabase 스키마 수정](docs/Supabase_스키마_수정_가이드.md)
+
+---
+
 ## 향후 개선 사항
 
 ### 단기 (MVP 이후)
