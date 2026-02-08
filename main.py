@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import json
 import re
 import urllib.parse
+from link_validator import get_safe_kstartup_link
 
 def scrape_kstartup_final():
     """K-Startup 페이지 소스에서 title 속성 기반 파싱"""
@@ -89,13 +90,49 @@ def scrape_kstartup_final():
                  title = tag.get_text(strip=True)
             
             # Metadata
+            deadline = "마감일 미정"
             deadline_elem = tag.select_one('.ann_top .right .txt')
-            deadline = deadline_elem.get_text(strip=True).replace('마감일자', '').strip() if deadline_elem else "마감일 미정"
+            if deadline_elem:
+                deadline = deadline_elem.get_text(strip=True).replace('마감일자', '').strip()
             
             lis = tag.select('.ann_cont ul li')
-            category = lis[0].get_text(strip=True) if len(lis) > 0 else "기타"
-            agency = lis[1].get_text(strip=True) if len(lis) > 1 else "미정"
-            views = lis[2].get_text(strip=True).replace('조회', '').strip() if len(lis) > 2 else "0"
+            if lis:
+                category = lis[0].get_text(strip=True) if len(lis) > 0 else "기타"
+                agency = lis[1].get_text(strip=True) if len(lis) > 1 else "미정"
+                views = lis[2].get_text(strip=True).replace('조회', '').strip() if len(lis) > 2 else "0"
+            else:
+                # Fallback for "go_view_blank" type structure (using span.list)
+                # Usually: Agency, RegDate, StartDate, EndDate, Views
+                # We need to find the container. Usually tag is <a> or <button>, parent is tit_wrap, grandparent is ann_cont?
+                # Or just search relative to tag's parent/grandparent
+                container = tag.find_parent('div', class_='slide') or tag.find_parent('li') # Find broader container
+                if container:
+                    spans = container.select('span.list')
+                    # Extract based on content
+                    category = "기타" # This type often lacks explicit category tag in the same place? Or check .flag
+                    
+                    flag = container.select_one('.flag.type01')
+                    if flag:
+                        category = flag.get_text(strip=True)
+
+                    agency = "미정"
+                    views = "0"
+                    
+                    for span in spans:
+                        text = span.get_text(strip=True)
+                        if '마감일자' in text:
+                            deadline = text.replace('마감일자', '').strip()
+                        elif '조회' in text:
+                            views = text.replace('조회', '').strip()
+                        elif '일자' not in text and '조회' not in text:
+                            # Assume it's agency if it's not a date or view count
+                            # Often the first span is agency
+                            if agency == "미정":
+                                agency = text
+            
+            if deadline == "마감일 미정":
+                # Try finding deadline in spans if not found above
+                pass
             
             # Title Cleaning
             title = re.sub(r'새창열기|바로가기|새로운게시글', '', title).strip()
@@ -107,17 +144,22 @@ def scrape_kstartup_final():
             
 
 
+            # Fix URL with Link Integrity Check (Integrated from link_validator)
             if is_blank:
                 # go_view_blank Items (External/Special) -> Use Search URL fallback
                 encoded_title = urllib.parse.quote(title)
+                # For blank items, search is the intended fallback, no need to validate detail URL first as it's known invalid
                 detail_url = f"https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schStr={encoded_title}"
             else:
-                # Standard Items -> Use ID based URL
-                detail_url = f"https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?pbancSn={pbanc_id}&schM=view"
+                # Standard Items -> Try ID based URL first, but validate it
+                candidate_url = f"https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?pbancSn={pbanc_id}&schM=view"
+                # Validate the candidate URL
+                detail_url = get_safe_kstartup_link(title, candidate_url)
             
             summary = f"[{category}] {agency} | 마감: {deadline} | 조회: {views}"
             
             results.append({
+                'id': pbanc_id,
                 'title': title,
                 'link': detail_url,
                 'source_site': 'K-STARTUP',

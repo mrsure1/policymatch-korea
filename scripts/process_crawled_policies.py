@@ -45,13 +45,14 @@ async def process_policies():
     print(f"[OK] Loaded {len(policies)} policies")
     
     # 2. 메타데이터가 있는지 확인 (title, link, source_site)
-    valid_policies = []
+    valid_items = []
     for p in policies:
         if p.get('title') and p.get('link'):
-            # (title, link) 형식으로 변환 - Gemini Analyzer가 기대하는 형식
-            valid_policies.append((p['title'], p['link']))
+            valid_items.append(p)
+            
+    valid_policies_for_ai = [(p['title'], p['link']) for p in valid_items]
     
-    print(f"[OK] Analysis target: {len(valid_policies)} policies")
+    print(f"[OK] Analysis target: {len(valid_items)} policies")
     
     # 3. Gemini 분석
     print("\n[Step 2] Gemini AI Metadata Analysis")
@@ -59,7 +60,7 @@ async def process_policies():
     
     try:
         analyzer = GeminiAnalyzer()
-        results = await analyzer.analyze_batch(valid_policies)
+        results = await analyzer.analyze_batch(valid_policies_for_ai)
         print(f"[OK] AI analysis completed: {len(results)} policies")
     except Exception as e:
         print(f"[ERROR] AI analysis failed: {e}")
@@ -83,8 +84,8 @@ async def process_policies():
                 failed_count += 1
                 continue
             
-            # 원본 데이터에서 link와 source_site 가져오기
-            original = policies[i] if i < len(policies) else {}
+            # 원본 데이터 매칭 (valid_items 사용)
+            original = valid_items[i]
             
             # DB 데이터 구조
             policy_data = {
@@ -98,7 +99,12 @@ async def process_policies():
                 'target_group': result.get('target_group'),
                 'support_type': result.get('support_type'),
                 'amount': result.get('amount'),
+                # Add ID if available to prevent duplicates or help matching
+                'external_id': original.get('id', None) 
             }
+            
+            # Note: upsert_policy needs to handle external_id if possible, 
+            # or we rely on title/link uniqueness.
             
             if db_client.upsert_policy(policy_data):
                 saved_count += 1
