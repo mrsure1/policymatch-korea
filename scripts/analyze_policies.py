@@ -93,8 +93,36 @@ async def analyze_and_save(
     else:
         print(f"✅ {len(policies)}개 정책 로드")
     
-    # 2. Gemini 분석
-    print("\n📊 Step 2: Gemini AI 분석")
+    # 2. 이미 분석된 데이터 필터링 (최적화)
+    print("\n🔍 Step 2: 중복 데이터 필터링")
+    print("-" * 70)
+    
+    if use_db:
+        try:
+            db_client = SupabaseClient()
+            existing_titles = set(db_client.get_existing_titles())
+            
+            new_policies = []
+            for p in policies:
+                # policies 리스트의 각 항목은 (title, content) 튜플임
+                title = p[0]
+                if title not in existing_titles:
+                    new_policies.append(p)
+            
+            print(f"   총 {len(policies)}개 중 {len(existing_titles)}개 이미 분석됨")
+            print(f"   => 분석 대상: {len(new_policies)}개")
+            
+            policies = new_policies
+            
+        except Exception as e:
+            print(f"⚠️  중복 확인 실패 (전체 분석 진행): {e}")
+
+    if not policies:
+        print("\n✅ 모든 정책이 이미 분석되어 있습니다. 종료합니다.")
+        return
+
+    # 3. Gemini 분석
+    print("\n📊 Step 3: Gemini AI 분석")
     print("-" * 70)
     
     try:

@@ -169,6 +169,26 @@ class SupabaseClient:
         
         return success_count
 
+    def get_existing_titles(self) -> List[str]:
+        """
+        이미 저장된 정책 제목 목록 조회
+        
+        Returns:
+            제목 리스트
+        """
+        try:
+            # 제목마 가져오기 (메타데이터가 있는 것만)
+            response = self.client.table('policy_funds') \
+                .select('title') \
+                .not_.is_('content_summary', 'null') \
+                .execute()
+            
+            return [item['title'] for item in response.data]
+            
+        except Exception as e:
+            print(f"❌ 기존 데이터 조회 실패: {e}")
+            return []
+
 
 # 테스트 코드
 def test_supabase():

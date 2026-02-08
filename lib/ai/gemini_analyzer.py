@@ -61,7 +61,7 @@ JSON만 응답:
         self.model = genai.GenerativeModel('gemini-2.5-flash')
         
         # 요청 간격 (Rate Limiting 대응 - 무료 티어는 더 길게)
-        self.request_interval = 10  # 초 (하루 20개 제한 대응)
+        self.request_interval = 4  # 초 (하루 20개 제한 -> 분당 15회 허용으로 완화)
         self.last_request_time = 0
     
     async def analyze_policy(self, text: str, title: str = "") -> Dict:
