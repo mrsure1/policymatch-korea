@@ -81,7 +81,8 @@ def parse_policy_json(json_path: str) -> List[tuple[str, str]]:
             
             # 제목만 반환 (상세 내용은 크롤링 필요)
             if title:
-                results.append((title, f"출처: {source}\nURL: {link}"))
+                # (title, content, link) 튜플 반환
+                results.append((title, f"출처: {source}\nURL: {link}", link))
         
         return results
         
@@ -110,9 +111,10 @@ def parse_sample_data_json(json_path: str) -> List[tuple[str, str]]:
         for item in items:
             title = item.get('서비스명', '')
             content = parse_gov24_service(item)
+            link = item.get('상세조회URL', '')
             
             if title and content:
-                results.append((title, content))
+                results.append((title, content, link))
         
         print(f"✅ {len(results)}개 정책 데이터 로드됨")
         return results

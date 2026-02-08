@@ -75,7 +75,8 @@ async def analyze_and_save(
             for hwp_file in hwp_files:
                 result = extract_text_from_hwp(str(hwp_file))
                 if result['success']:
-                    policies.append((result['title'], result['content']))
+                    # HWP는 링크 없음 (None)
+                    policies.append((result['title'], result['content'], None))
                     print(f"  ✅ {hwp_file.name}")
                 else:
                     print(f"  ❌ {hwp_file.name}: {result['error']}")
@@ -97,6 +98,9 @@ async def analyze_and_save(
     print("\n🔍 Step 2: 중복 데이터 필터링")
     print("-" * 70)
     
+    # 정책 링크 맵 생성 (Title -> Link)
+    title_to_link = {p[0]: p[2] for p in policies if len(p) > 2}
+    
     if use_db:
         try:
             db_client = SupabaseClient()
@@ -104,7 +108,7 @@ async def analyze_and_save(
             
             new_policies = []
             for p in policies:
-                # policies 리스트의 각 항목은 (title, content) 튜플임
+                # policies 리스트의 각 항목은 (title, content, link)
                 title = p[0]
                 if title not in existing_titles:
                     new_policies.append(p)
@@ -125,12 +129,22 @@ async def analyze_and_save(
     print("\n📊 Step 3: Gemini AI 분석")
     print("-" * 70)
     
+    # 분석기에는 (title, content)만 전달
+    policies_for_analysis = [(p[0], p[1]) for p in policies]
+    
     try:
         analyzer = GeminiAnalyzer()
-        results = await analyzer.analyze_batch(policies)
+        results = await analyzer.analyze_batch(policies_for_analysis)
     except Exception as e:
         print(f"❌ 분석 실패: {e}")
         return
+    
+    # 결과에 원본 링크 병합
+    for result in results:
+        if result['success']:
+            title = result.get('title', '')
+            if title in title_to_link:
+                result['link'] = title_to_link[title]
     
     # 3. 결과 저장
     print("\n💾 Step 3: 결과 저장")
@@ -147,9 +161,13 @@ async def analyze_and_save(
                     print(f"⚠️  {i+1}. {result.get('title', 'N/A')}: 분석 실패 - 건너뜀")
                     continue
                 
+                title = result.get('title', '')
+                link = title_to_link.get(title)
+                
                 # DB 데이터 구조
                 policy_data = {
-                    'title': result.get('title', ''),
+                    'title': title,
+                    'link': link,  # 링크 추가
                     'content_summary': result.get('summary'),
                     'region': result.get('region'),
                     'biz_age': result.get('biz_age'),
