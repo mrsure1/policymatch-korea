@@ -152,7 +152,8 @@ def scrape_kstartup_final():
                 detail_url = f"https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schStr={encoded_title}"
             else:
                 # Standard Items -> Try ID based URL first, but validate it
-                candidate_url = f"https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?pbancSn={pbanc_id}&schM=view"
+                # [FIX]: Use detail.do instead of ongoing.do for direct access
+                candidate_url = f"https://www.k-startup.go.kr/web/contents/bizpbanc-detail.do?pbancSn={pbanc_id}&schM=view"
                 # Validate the candidate URL
                 detail_url = get_safe_kstartup_link(title, candidate_url)
             
