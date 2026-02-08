@@ -33,7 +33,11 @@ class GeminiAnalyzer:
   "industry": "지원 대상 업종 (예: '제조업', 'IT/SW', '콘텐츠', '바이오', '무관')",
   "target_group": "특화 대상 (예: '청년', '여성', '장애인', '중장년', '일반')",
   "support_type": "지원 형태 (예: '융자', '보조금', '멘토링', '공간', '교육')",
-  "amount": "지원 금액 또는 규모 (예: '최대 5천만원', '업체당 3백만원', '미명시')"
+  "amount": "지원 금액 또는 규모 (예: '최대 5천만원', '업체당 3백만원', '미명시')",
+  "agency": "주관기관 또는 소관부처 (예: '중소벤처기업부', '창업진흥원')",
+  "application_period": "신청 기간 (예: '2024.01.01 ~ 2024.01.31', '상시모집')",
+  "application_method": "신청 방법 (예: 'K-Startup 사이트 접수', '이메일 접수', '방문 접수')",
+  "inquiry": "문의처 (예: '02-123-4567', '담당자 이메일')"
 }}
 
 공고문:
@@ -184,7 +188,8 @@ JSON만 응답:
             # 필수 필드 검증 및 기본값 설정
             required_fields = [
                 'summary', 'region', 'biz_age', 'industry',
-                'target_group', 'support_type', 'amount'
+                'target_group', 'support_type', 'amount',
+                'agency', 'application_period', 'application_method', 'inquiry'
             ]
             
             for field in required_fields:
@@ -205,7 +210,11 @@ JSON만 응답:
                 'industry': None,
                 'target_group': None,
                 'support_type': None,
-                'amount': None
+                'amount': None,
+                'agency': None,
+                'application_period': None,
+                'application_method': None,
+                'inquiry': None
             }
     
     async def _wait_for_rate_limit(self):

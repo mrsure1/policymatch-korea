@@ -16,13 +16,15 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
         url: dbPolicy.link || dbPolicy.url || undefined,
         mobileUrl: dbPolicy.mobile_url || undefined,
         detailContent: dbPolicy.raw_content || undefined,
+        inquiry: dbPolicy.inquiry || undefined,
+        applicationMethod: dbPolicy.application_method || undefined,
 
         criteria: {
-            entityTypes: dbPolicy.criteria?.entityTypes || [],
-            ageGroups: dbPolicy.criteria?.ageGroups || [],
+            entityTypes: (dbPolicy.criteria?.entityTypes || []) as any,
+            ageGroups: (dbPolicy.criteria?.ageGroups || []) as any,
             regions: dbPolicy.criteria?.regions || (dbPolicy.region ? [dbPolicy.region] : []),
             industries: dbPolicy.criteria?.industries || (dbPolicy.industry ? dbPolicy.industry.split(',').map((s: string) => s.trim()) : []),
-            businessPeriods: dbPolicy.criteria?.businessPeriods || (dbPolicy.biz_age ? [dbPolicy.biz_age] : []),
+            businessPeriods: (dbPolicy.criteria?.businessPeriods || (dbPolicy.biz_age ? [dbPolicy.biz_age] : [])) as any,
         },
 
         roadmap: dbPolicy.roadmap || [],

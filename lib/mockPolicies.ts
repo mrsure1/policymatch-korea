@@ -31,6 +31,8 @@ export interface Policy {
     url?: string;
     mobileUrl?: string;
     detailContent?: string;
+    inquiry?: string;
+    applicationMethod?: string;
 
     // Matching criteria
     criteria: {

@@ -54,7 +54,11 @@ class SupabaseClient:
             amount TEXT,
             raw_content TEXT,
             created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW()
+            updated_at TIMESTAMP DEFAULT NOW(),
+            agency TEXT,
+            application_period TEXT,
+            application_method TEXT,
+            inquiry TEXT
         );
         """
         print("⚠️  테이블 생성은 Supabase 대시보드에서 직접 실행해주세요.")
@@ -77,7 +81,11 @@ class SupabaseClient:
                 'target_group': str (optional),
                 'support_type': str (optional),
                 'amount': str (optional),
-                'raw_content': str (optional)
+                'raw_content': str (optional),
+                'agency': str (optional),
+                'application_period': str (optional),
+                'application_method': str (optional),
+                'inquiry': str (optional)
             }
             
         Returns:

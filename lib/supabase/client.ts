@@ -24,6 +24,8 @@ export interface PolicyFundDB {
     d_day: number | null
     url: string | null
     mobile_url: string | null
+    inquiry: string | null
+    application_method: string | null
     roadmap: RoadmapStep[]
     documents: PolicyDocument[]
     criteria: PolicyCriteria

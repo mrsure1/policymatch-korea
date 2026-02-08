@@ -182,6 +182,28 @@ export default function PolicyDetailPage() {
                             <p className="text-xs text-slate-500 font-bold mb-1">신청 기간</p>
                             <p className="font-semibold text-slate-900">{policy.applicationPeriod || '상시'}</p>
                         </div>
+
+                        {/* 소관기관 */}
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                            <p className="text-xs text-slate-500 font-bold mb-1">소관기관</p>
+                            <p className="font-semibold text-slate-900">{policy.agency}</p>
+                        </div>
+
+                        {/* 신청방법 */}
+                        {policy.applicationMethod && (
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                <p className="text-xs text-slate-500 font-bold mb-1">신청방법</p>
+                                <p className="font-semibold text-slate-900">{policy.applicationMethod}</p>
+                            </div>
+                        )}
+
+                        {/* 문의처 */}
+                        {policy.inquiry && (
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 sm:col-span-2">
+                                <p className="text-xs text-slate-500 font-bold mb-1">문의처</p>
+                                <p className="font-semibold text-slate-900">{policy.inquiry}</p>
+                            </div>
+                        )}
                     </div>
 
                     {/* 지역 정보 */}

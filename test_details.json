@@ -1,0 +1,19 @@
+[
+  {
+    "summary": "3~5세 유아의 유치원 학비 및 방과후과정비를 지원하는 정책입니다. 국공립 및 사립유치원 재원 유아에게 교육비와 방과후과정비를 지급하며, 저소득층 유아에게는 추가 지원이 있습니다. 복지로 온라인 또는 읍면동 주민센터를 통해 신청 가능합니다.",
+    "region": "전국",
+    "biz_age": null,
+    "industry": null,
+    "target_group": "3~5세 유아, 저소득층 유아",
+    "support_type": "현금",
+    "amount": "국공립 교육비 월 10만원, 사립 교육비 월 28만원, 국공립 방과후과정비 월 5만원, 사립 방과후과정비 월 7만원, 저소득층 사립유치원 유아 추가 월 20만원",
+    "agency": "교육부",
+    "application_period": "미명시",
+    "application_method": "온라인 (복지로), 방문 (읍면동 주민센터)",
+    "inquiry": null,
+    "success": true,
+    "error": null,
+    "title": "유아학비 (누리과정) 지원",
+    "link": "https://www.gov.kr/portal/rcvfvrSvc/dtlEx/000000465790"
+  }
+]

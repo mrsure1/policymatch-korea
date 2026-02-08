@@ -175,6 +175,10 @@ async def analyze_and_save(
                     'target_group': result.get('target_group'),
                     'support_type': result.get('support_type'),
                     'amount': result.get('amount'),
+                    'agency': result.get('agency'),
+                    'application_period': result.get('application_period'),
+                    'application_method': result.get('application_method'),
+                    'inquiry': result.get('inquiry'),
                     'source_site': 'GOV24_API'
                 }
                 
