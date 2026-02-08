@@ -177,10 +177,11 @@ class SupabaseClient:
             제목 리스트
         """
         try:
-            # 제목마 가져오기 (메타데이터가 있는 것만)
+            # 제목만 가져오기 (메타데이터와 링크가 모두 있는 것만)
             response = self.client.table('policy_funds') \
                 .select('title') \
                 .not_.is_('content_summary', 'null') \
+                .not_.is_('link', 'null') \
                 .execute()
             
             return [item['title'] for item in response.data]
