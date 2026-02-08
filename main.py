@@ -145,17 +145,10 @@ def scrape_kstartup_final():
 
 
             # Fix URL with Link Integrity Check (Integrated from link_validator)
-            if is_blank:
-                # go_view_blank Items (External/Special) -> Use Search URL fallback
-                encoded_title = urllib.parse.quote(title)
-                # For blank items, search is the intended fallback, no need to validate detail URL first as it's known invalid
-                detail_url = f"https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schStr={encoded_title}"
-            else:
-                # Standard Items -> Try ID based URL first, but validate it
-                # [FIX]: Use detail.do instead of ongoing.do for direct access
-                candidate_url = f"https://www.k-startup.go.kr/web/contents/bizpbanc-detail.do?pbancSn={pbanc_id}&schM=view"
-                # Validate the candidate URL
-                detail_url = get_safe_kstartup_link(title, candidate_url)
+            # [FIX] Use Search URL Strategy for ALL K-Startup items for reliability
+            # Direct detail links (ongoing.do/detail.do) are unstable/blank for some users
+            encoded_title = urllib.parse.quote(title)
+            detail_url = f"https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=list&schStr={encoded_title}"
             
             summary = f"[{category}] {agency} | 마감: {deadline} | 조회: {views}"
             

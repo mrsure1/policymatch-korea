@@ -37,7 +37,12 @@ for i, p in enumerate(result.data, 1):
             
             if response.status_code == 200:
                 # 페이지 내용에 공고 번호가 있는지 확인
-                if 'pbancSn' in response.url or '공고' in response.text[:1000]:
+                if 'schStr=' in response.url:
+                     if 'pbancSn' in response.text or 'viewDetail' in response.text or '조회' in response.text:
+                         print("✅ 검색 링크 작동 - 목록에 결과 표시됨")
+                     else:
+                         print("⚠️ 검색 결과 없음 또는 페이지 문제")
+                elif 'pbancSn' in response.url or '공고' in response.text[:1000]:
                     print("✅ 링크 작동 - 공고 페이지로 연결됨")
                 else:
                     print("⚠️ 페이지는 열리지만 공고 내용 확인 불가")

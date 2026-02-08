@@ -16,9 +16,12 @@ def fix_policies_json():
     fixed_count = 0
     for item in data:
         link = item.get('link', '')
-        if 'bizpbanc-ongoing.do?pbancSn=' in link:
-            # Replace ongoing.do with detail.do
-            new_link = link.replace('bizpbanc-ongoing.do', 'bizpbanc-detail.do')
+        if 'k-startup.go.kr' in link and 'schStr=' not in link:
+            # Replace with Search URL
+            title = item['title']
+            import urllib.parse
+            encoded_title = urllib.parse.quote(title)
+            new_link = f"https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=list&schStr={encoded_title}"
             item['link'] = new_link
             fixed_count += 1
             
