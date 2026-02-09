@@ -100,7 +100,7 @@ export default function HomePage() {
           </div>
           <button
             onClick={resetProfile}
-            className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-500/40 text-slate-100 hover:border-sky-400 hover:text-white transition-colors bg-slate-900/40"
+            className="flex items-center gap-2 px-4 py-2 rounded-full border border-sky-200/70 bg-sky-300 text-slate-900 font-semibold shadow-sm hover:bg-sky-200 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             <span className="text-sm font-semibold">다시 시작</span>
@@ -266,7 +266,7 @@ export default function HomePage() {
         ) : matchedPolicies.length > 0 ? (
           <div className="space-y-10">
             {matchedList.length > 0 && (
-              <div className="rounded-2xl border border-sky-300/40 bg-slate-900/60 p-5 shadow-lg">
+              <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-br from-sky-900/60 via-slate-900/50 to-indigo-900/60 p-5 shadow-lg ring-1 ring-sky-300/20">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                   <div>
                     <h3 className="text-lg font-bold text-slate-100">맞춤 매칭 정책</h3>
@@ -285,13 +285,13 @@ export default function HomePage() {
             )}
 
             {commonList.length > 0 && (
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-900/30 p-5">
+              <div className="rounded-2xl border border-slate-500/40 bg-gradient-to-br from-slate-900/40 via-slate-900/20 to-slate-800/40 p-5 ring-1 ring-white/5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                   <div>
                     <h3 className="text-lg font-bold text-slate-100">공통 공고</h3>
                     <p className="text-xs text-slate-400 mt-1">전체/전국/무관 등 공통 조건 공고</p>
                   </div>
-                  <span className="text-xs font-semibold text-slate-200 bg-slate-800/70 px-3 py-1 rounded-full border border-slate-700/60">
+                  <span className="text-xs font-semibold text-slate-900 bg-white/80 px-3 py-1 rounded-full border border-slate-200/80">
                     {commonList.length}건
                   </span>
                 </div>

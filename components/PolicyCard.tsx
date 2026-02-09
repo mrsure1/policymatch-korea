@@ -55,8 +55,8 @@ export default function PolicyCard({ policy, variant = 'default' }: PolicyCardPr
                 : '';
 
     return (
-        <Link href={`/policy/${policy.id}`}>
-            <div className={`glass-card ${variantClass} rounded-2xl border border-white/40 hover:border-sky-300/60 hover:-translate-y-1 hover:shadow-2xl transition-all p-6 cursor-pointer text-slate-900`}>
+        <Link href={`/policy/${policy.id}`} className="h-full">
+            <div className={`glass-card ${variantClass} h-full min-h-[280px] rounded-2xl border border-white/40 hover:border-sky-300/60 hover:-translate-y-1 hover:shadow-2xl transition-all p-6 cursor-pointer text-slate-900 flex flex-col`}>
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
@@ -79,7 +79,7 @@ export default function PolicyCard({ policy, variant = 'default' }: PolicyCardPr
                 </div>
 
                 {/* Summary */}
-                <p className="text-slate-700 text-sm mb-4 line-clamp-2">
+                <p className="text-slate-700 text-sm mb-4 line-clamp-2 flex-1">
                     {policy.summary}
                 </p>
 
@@ -96,7 +96,7 @@ export default function PolicyCard({ policy, variant = 'default' }: PolicyCardPr
                 </div>
 
                 {/* CTA */}
-                <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
+                <div className="mt-auto pt-4 border-t border-slate-200 flex items-center justify-between">
                     <span className="text-sm text-slate-600">
                         로드맵 {policy.roadmap?.length || 0}단계 • 서류 {policy.documents?.length || 0}개
                     </span>

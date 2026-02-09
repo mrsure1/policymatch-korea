@@ -114,7 +114,7 @@ export default function PolicyDetailPage() {
                 <div className="max-w-4xl mx-auto px-4 py-4">
                     <button
                         onClick={() => router.back()}
-                        className="flex items-center gap-2 text-slate-200 hover:text-sky-300 transition-colors mb-2"
+                        className="flex items-center gap-2 text-slate-100 bg-slate-800/70 border border-slate-600/40 px-3 py-1.5 rounded-full hover:bg-slate-700/70 hover:text-white transition-colors mb-2"
                     >
                         <ArrowLeft className="w-5 h-5" />
                         <span className="font-semibold">뒤로가기</span>
