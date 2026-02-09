@@ -17,8 +17,8 @@ function extractAgencyFallback(title?: string, summary?: string): string | undef
     const s = (summary || '').trim()
 
     // 1) Leading bracketed 기관명 in title
-    const bracketMatch = t.match(/^\s*(?:\[(?<b1>[^\]]+)\]|\((?<b2>[^)]+)\)|【(?<b3>[^】]+)】|「(?<b4>[^」]+)」)/)
-    const fromTitle = bracketMatch?.groups?.b1 || bracketMatch?.groups?.b2 || bracketMatch?.groups?.b3 || bracketMatch?.groups?.b4
+    const bracketMatch = t.match(/^\s*(?:\[([^\]]+)\]|\(([^)]+)\)|\u3010([^\u3011]+)\u3011|\u300C([^\u300D]+)\u300D)/)
+    const fromTitle = bracketMatch?.[1] || bracketMatch?.[2] || bracketMatch?.[3] || bracketMatch?.[4]
     if (fromTitle) return fromTitle.trim()
 
     // 2) Summary pattern: "[프로그램] 기관명 | ..."
