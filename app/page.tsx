@@ -230,7 +230,7 @@ export default function HomePage() {
           <div>
             <h2 className="text-2xl font-bold text-slate-100">
               매칭된 정책
-              <span className="ml-2 text-lg font-bold text-sky-300 font-sans tabular-nums tracking-normal leading-none">
+              <span className="ml-2 text-2xl font-extrabold text-sky-200 font-sans tabular-nums tracking-tight leading-none drop-shadow-sm">
                 {loading ? '...' : matchedPolicies.length}
               </span>
               개
@@ -242,7 +242,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <div className="glass-dark px-4 py-2 rounded-full text-xs font-semibold text-slate-200">
               매칭 수
-              <span className="ml-2 text-lg font-bold text-sky-300 font-sans tabular-nums">
+              <span className="ml-2 text-xl font-extrabold text-sky-200 font-sans tabular-nums tracking-tight leading-none drop-shadow-sm">
                 {loading ? '...' : matchedPolicies.length}
               </span>
             </div>
