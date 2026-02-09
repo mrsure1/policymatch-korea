@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase/client'
 import type { PolicyFundDB } from '@/lib/supabase/client'
 import type { Policy } from '@/lib/mockPolicies'
+export const runtime = 'edge'
 
 function cleanKStartupSearchTerm(title?: string): string {
     if (!title) return ''

@@ -6,6 +6,7 @@ import { usePolicies } from '@/lib/hooks/usePolicies';
 import RoadmapTimeline from '@/components/RoadmapTimeline';
 import DocumentChecklist from '@/components/DocumentChecklist';
 import { ArrowLeft, Calendar, Building2, TrendingUp, MapPin, FileCheck, Loader2, ExternalLink, AlertTriangle, Info, Map } from 'lucide-react';
+export const runtime = 'edge'
 
 export default function PolicyDetailPage() {
     const params = useParams();
