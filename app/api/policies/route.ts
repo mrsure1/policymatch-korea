@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase/client'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import type { PolicyFundDB } from '@/lib/supabase/client'
 import type { Policy } from '@/lib/mockPolicies'
 export const runtime = 'edge'
@@ -348,6 +348,13 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
 
 export async function GET() {
     try {
+        const supabase = getSupabaseClient()
+        if (!supabase) {
+            return NextResponse.json(
+                { success: false, error: 'Missing Supabase environment variables', data: [] },
+                { status: 500 }
+            )
+        }
         // Supabase에서 모든 정책 데이터 가져오기
         const { data, error } = await supabase
             .from('policy_funds')
