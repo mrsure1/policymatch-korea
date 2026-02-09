@@ -11,6 +11,22 @@ const REGIONS = ['서울', '경기', '부산', '대구', '인천', '광주', '�
 const INDUSTRIES = ['IT', '제조업', '서비스', '도소매', '건설업', '음식업', '기타'];
 const BUSINESS_PERIODS = ['1년 미만', '1-3년', '3-7년', '7년 이상'] as const;
 
+const optionClass = (selected: boolean, size: 'card' | 'chip' = 'card') => {
+    const base =
+        size === 'chip'
+            ? 'w-full rounded-lg border px-3 py-2 text-center text-sm font-semibold transition-all bg-white/70 hover:bg-white hover:-translate-y-0.5 hover:shadow-md'
+            : 'w-full rounded-xl border px-4 py-4 text-left transition-all bg-white/80 hover:bg-white hover:-translate-y-0.5 hover:shadow-md';
+    const selectedClass =
+        size === 'chip'
+            ? 'border-sky-400/80 bg-gradient-to-br from-sky-50 via-white to-indigo-50 text-slate-900 shadow-sm ring-1 ring-sky-300/30'
+            : 'border-sky-400/80 bg-gradient-to-br from-sky-50 via-white to-indigo-50 text-slate-900 shadow-md ring-1 ring-sky-300/40';
+    const unselectedClass =
+        size === 'chip'
+            ? 'border-slate-200/80 text-slate-700 hover:border-sky-300/70'
+            : 'border-slate-200/80 text-slate-700 hover:border-sky-300/70';
+    return `${base} ${selected ? selectedClass : unselectedClass}`;
+};
+
 export default function OnboardingForm() {
     const { profile, updateProfile, completeOnboarding } = useUserProfileStore();
     const [step, setStep] = useState(0); // Start at 0 for hero screen
@@ -111,7 +127,7 @@ export default function OnboardingForm() {
                             </div>
                             <div className="w-full h-1.5 bg-slate-200/60 rounded-full overflow-hidden">
                                 <div
-                                    className="h-full bg-slate-900 transition-all duration-300 ease-out rounded-full"
+                                    className="h-full bg-gradient-to-r from-sky-400 via-cyan-400 to-indigo-500 transition-all duration-300 ease-out rounded-full"
                                     style={{ width: `${(step / totalSteps) * 100}%` }}
                                 />
                             </div>
@@ -124,19 +140,16 @@ export default function OnboardingForm() {
                                     <h3 className="text-2xl font-bold text-slate-900 mb-2">어떤 유형으로 사업 중이신가요?</h3>
                                     <p className="text-slate-500 mb-5">가장 적합한 유형을 선택해주세요.</p>
 
-                                    <div className="grid grid-cols-1 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         {ENTITY_TYPES.map((type) => (
                                             <button
                                                 key={type}
                                                 onClick={() => updateProfile({ entityType: type })}
-                                                className={`p-4 rounded-xl border text-left transition-all ${profile.entityType === type
-                                                    ? 'border-slate-900 bg-slate-900/10 text-slate-900 ring-1 ring-slate-900/30'
-                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700'
-                                                    }`}
+                                                className={optionClass(profile.entityType === type, 'card')}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-base font-bold">{type}</span>
-                                                    {profile.entityType === type && <div className="w-3 h-3 rounded-full bg-slate-900" />}
+                                                    {profile.entityType === type && <div className="w-3 h-3 rounded-full bg-sky-500 shadow-sm" />}
                                                 </div>
                                             </button>
                                         ))}
@@ -149,19 +162,16 @@ export default function OnboardingForm() {
                                     <h3 className="text-2xl font-bold text-slate-900 mb-2">대표자 연령대는 어떻게 되시나요?</h3>
                                     <p className="text-slate-500 mb-5">청년 창업 지원 등 연령별 우대 정책 매칭에 활용됩니다.</p>
 
-                                    <div className="grid grid-cols-1 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         {AGE_GROUPS.map((age) => (
                                             <button
                                                 key={age}
                                                 onClick={() => updateProfile({ age })}
-                                                className={`p-4 rounded-xl border text-left transition-all ${profile.age === age
-                                                    ? 'border-slate-900 bg-slate-900/10 text-slate-900 ring-1 ring-slate-900/30'
-                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700'
-                                                    }`}
+                                                className={optionClass(profile.age === age, 'card')}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-base font-bold">{age}</span>
-                                                    {profile.age === age && <div className="w-3 h-3 rounded-full bg-slate-900" />}
+                                                    {profile.age === age && <div className="w-3 h-3 rounded-full bg-sky-500 shadow-sm" />}
                                                 </div>
                                             </button>
                                         ))}
@@ -174,15 +184,12 @@ export default function OnboardingForm() {
                                     <h3 className="text-2xl font-bold text-slate-900 mb-2">사업장은 어디에 위치해 있나요?</h3>
                                     <p className="text-slate-500 mb-5">해당 지역의 지자체 지원사업을 찾아드립니다.</p>
 
-                                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[200px] sm:max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 max-h-[200px] sm:max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
                                         {REGIONS.map((region) => (
                                             <button
                                                 key={region}
                                                 onClick={() => updateProfile({ region })}
-                                                className={`py-2 px-2 rounded-lg border text-center text-sm transition-all ${profile.region === region
-                                                    ? 'border-slate-900 bg-slate-900 text-white font-bold shadow-md'
-                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700 font-medium hover:bg-slate-50'
-                                                    }`}
+                                                className={optionClass(profile.region === region, 'chip')}
                                             >
                                                 {region}
                                             </button>
@@ -196,15 +203,12 @@ export default function OnboardingForm() {
                                     <h3 className="text-2xl font-bold text-slate-900 mb-2">주력 업종은 무엇인가요?</h3>
                                     <p className="text-slate-500 mb-5">업종별 특화 지원사업 매칭에 필요합니다.</p>
 
-                                    <div className="grid grid-cols-2 gap-3 max-h-[190px] sm:max-h-[230px] overflow-y-auto pr-1 custom-scrollbar">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[190px] sm:max-h-[230px] overflow-y-auto pr-1 custom-scrollbar">
                                         {INDUSTRIES.map((industry) => (
                                             <button
                                                 key={industry}
                                                 onClick={() => updateProfile({ industry })}
-                                                className={`p-3 rounded-xl border text-center text-sm transition-all ${profile.industry === industry
-                                                    ? 'border-slate-900 bg-slate-900/10 text-slate-900 ring-1 ring-slate-900/30 font-bold'
-                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700 font-medium'
-                                                    }`}
+                                                className={optionClass(profile.industry === industry, 'chip')}
                                             >
                                                 {industry}
                                             </button>
@@ -218,19 +222,16 @@ export default function OnboardingForm() {
                                     <h3 className="text-2xl font-bold text-slate-900 mb-2">사업을 시작한 지 얼마나 되셨나요?</h3>
                                     <p className="text-slate-500 mb-5">창업 초기, 도약기 등 단계별 맞춤 지원을 추천해드립니다.</p>
 
-                                    <div className="grid grid-cols-1 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                         {BUSINESS_PERIODS.map((period) => (
                                             <button
                                                 key={period}
                                                 onClick={() => updateProfile({ businessPeriod: period })}
-                                                className={`p-4 rounded-xl border text-left transition-all ${profile.businessPeriod === period
-                                                    ? 'border-slate-900 bg-slate-900/10 text-slate-900 ring-1 ring-slate-900/30'
-                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700'
-                                                    }`}
+                                                className={optionClass(profile.businessPeriod === period, 'card')}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-base font-bold">{period}</span>
-                                                    {profile.businessPeriod === period && <div className="w-3 h-3 rounded-full bg-slate-900" />}
+                                                    {profile.businessPeriod === period && <div className="w-3 h-3 rounded-full bg-sky-500 shadow-sm" />}
                                                 </div>
                                             </button>
                                         ))}
@@ -253,7 +254,7 @@ export default function OnboardingForm() {
                                 onClick={handleNext}
                                 disabled={!isStepValid()}
                                 className={`flex-1 px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${isStepValid()
-                                    ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-md'
+                                    ? 'bg-gradient-to-r from-sky-300 via-cyan-300 to-indigo-300 text-slate-900 btn-gradient shadow-lg hover:shadow-xl'
                                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                     }`}
                             >
