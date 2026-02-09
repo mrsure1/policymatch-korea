@@ -6,6 +6,9 @@ export interface UserProfile {
     businessPeriod: '1년 미만' | '1-3년' | '3-7년' | '7년 이상' | '';
 }
 
+export type PolicyAgeGroup = UserProfile['age'] | '\uC804\uCCB4';
+
+
 export interface PolicyRoadmapStep {
     step: number;
     title: string;
@@ -38,7 +41,7 @@ export interface Policy {
     // Matching criteria
     criteria: {
         entityTypes?: UserProfile['entityType'][];
-        ageGroups?: UserProfile['age'][];
+        ageGroups?: PolicyAgeGroup[];
         regions?: string[];
         industries?: string[];
         businessPeriods?: UserProfile['businessPeriod'][];
