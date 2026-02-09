@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Policy, UserProfile } from '@/lib/mockPolicies';
 
+type ScoredPolicy = { policy: Policy; score: number; scoreRatio: number; isGeneric: boolean };
+
 interface UsePoliciesResult {
     policies: Policy[];
     loading: boolean;
@@ -93,7 +95,7 @@ export function usePolicies(profile: UserProfile, options?: { skipFiltering?: bo
                         });
                         const genericTokens = ['전체', '전국', '제한없음', '무관'];
 
-                        const scoredData = filteredData.map((policy: Policy) => {
+                        const scoredData: ScoredPolicy[] = filteredData.map((policy: Policy) => {
                             const criteria = policy.criteria || {};
 
                             const hasMeaningfulList = (list?: string[]) => {
@@ -135,7 +137,7 @@ export function usePolicies(profile: UserProfile, options?: { skipFiltering?: bo
                             return { policy, score, scoreRatio, isGeneric };
                         });
 
-                        scoredData.sort((a, b) => {
+                        scoredData.sort((a: ScoredPolicy, b: ScoredPolicy) => {
                             if (a.isGeneric !== b.isGeneric) return a.isGeneric ? 1 : -1;
                             if (b.scoreRatio !== a.scoreRatio) return b.scoreRatio - a.scoreRatio;
                             if (b.score !== a.score) return b.score - a.score;
