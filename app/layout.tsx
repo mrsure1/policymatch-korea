@@ -1,5 +1,18 @@
 import type { Metadata } from "next";
+import { Noto_Sans_KR, Playfair_Display } from "next/font/google";
 import "./globals.css";
+
+const sans = Noto_Sans_KR({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-sans",
+});
+
+const display = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display",
+});
 
 export const metadata: Metadata = {
   title: "PolicyMatch Korea - 정부 정책자금 매칭 서비스",
@@ -13,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className="antialiased">
+      <body className={`${sans.variable} ${display.variable} antialiased`}>
         {children}
       </body>
     </html>

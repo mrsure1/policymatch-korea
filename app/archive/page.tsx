@@ -13,40 +13,46 @@ export default function ArchivePage() {
     const { policies, loading, error } = usePolicies(profile, { skipFiltering: true });
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 bg-[url('/bg-mesh.svg')] bg-cover opacity-70" />
+            <div className="pointer-events-none absolute inset-0 bg-[url('/texture-grid.svg')] bg-cover opacity-50 mix-blend-soft-light" />
+
             {/* Header */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+            <header className="sticky top-0 z-20 glass-dark">
                 <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <Link href="/" className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600">
+                        <Link
+                            href="/"
+                            className="p-2 rounded-full border border-slate-700/50 bg-slate-900/40 hover:border-sky-400 transition-colors text-slate-200"
+                        >
                             <ArrowLeft className="w-5 h-5" />
                         </Link>
                         <div>
-                            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                                <FileText className="w-5 h-5 text-indigo-600" />
+                            <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                                <FileText className="w-5 h-5 text-sky-300" />
                                 정책 자료실 (전체 공고)
                             </h1>
-                            <p className="text-xs text-slate-500">수집된 2026년 모든 지원사업 리스트</p>
+                            <p className="text-xs text-slate-300">수집된 2026년 모든 지원사업 리스트</p>
                         </div>
                     </div>
-                    <div className="bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
-                        <span className="text-xs font-bold text-indigo-700">
+                    <div className="bg-slate-900/60 px-3 py-1 rounded-full border border-slate-700/50">
+                        <span className="text-xs font-bold text-sky-200">
                             총 {loading ? '...' : policies.length}건
                         </span>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-6xl mx-auto px-4 py-8">
+            <main className="max-w-6xl mx-auto px-4 py-6 relative z-10">
                 {/* Intro Banner */}
-                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 mb-8 text-white shadow-lg">
+                <div className="glass-card rounded-2xl p-6 mb-8 text-slate-900">
                     <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-md">
                             <Sparkles className="w-6 h-6 text-white" />
                         </div>
                         <div>
                             <h2 className="text-lg font-bold mb-1">전체 공고 모아보기</h2>
-                            <p className="text-indigo-100 text-sm leading-relaxed">
+                            <p className="text-slate-600 text-sm leading-relaxed">
                                 매칭 여부와 상관없이, 현재 시스템에 등록된 모든 2026년 정책자금 공고를 확인할 수 있습니다.
                             </p>
                         </div>
@@ -57,12 +63,12 @@ export default function ArchivePage() {
                 {loading ? (
                     <div className="flex justify-center py-20">
                         <div className="flex flex-col items-center gap-3">
-                            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-                            <p className="text-slate-500 font-semibold">전체 데이터를 불러오는 중입니다...</p>
+                            <Loader2 className="w-10 h-10 text-sky-300 animate-spin" />
+                            <p className="text-slate-300 font-semibold">전체 데이터를 불러오는 중입니다...</p>
                         </div>
                     </div>
                 ) : error ? (
-                    <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
+                    <div className="glass-card rounded-2xl p-8 text-center text-slate-900">
                         <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
                         <p className="text-slate-800 font-bold mb-1">데이터를 불러올 수 없습니다</p>
                         <p className="text-sm text-slate-500">{error}</p>
@@ -74,7 +80,7 @@ export default function ArchivePage() {
                         ))}
                     </div>
                 ) : (
-                    <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                    <div className="glass-card rounded-2xl p-12 text-center text-slate-900">
                         <p className="text-slate-600 mb-2">등록된 공고가 없습니다</p>
                         <p className="text-sm text-slate-500">데이터 갱신 스크립트를 실행해주세요.</p>
                     </div>

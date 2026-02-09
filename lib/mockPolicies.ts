@@ -28,6 +28,7 @@ export interface Policy {
     dDay: number;
     applicationPeriod: string;
     agency: string;
+    sourcePlatform?: string;
     url?: string;
     mobileUrl?: string;
     detailContent?: string;
@@ -59,6 +60,7 @@ export const mockPolicies: Policy[] = [
         dDay: 15,
         applicationPeriod: '2026년 3월 1일 ~ 3월 31일',
         agency: '중소벤처기업부',
+        sourcePlatform: 'K-Startup',
 
         criteria: {
             entityTypes: ['예비창업자'],
@@ -140,6 +142,7 @@ export const mockPolicies: Policy[] = [
         dDay: 45,
         applicationPeriod: '2026년 2월 1일 ~ 12월 31일 (상시)',
         agency: '소상공인시장진흥공단',
+        sourcePlatform: '소상공인마당',
 
         criteria: {
             entityTypes: ['소상공인'],
@@ -231,6 +234,7 @@ export const mockPolicies: Policy[] = [
         dDay: 30,
         applicationPeriod: '2026년 3월 15일 ~ 6월 30일',
         agency: '경기도경제과학진흥원',
+        sourcePlatform: '이지비즈',
 
         criteria: {
             entityTypes: ['중소기업'],
@@ -340,6 +344,7 @@ export const mockPolicies: Policy[] = [
         dDay: 20,
         applicationPeriod: '2026년 4월 1일 ~ 5월 31일',
         agency: '서울산업진흥원',
+        sourcePlatform: '서울기업지원센터',
 
         criteria: {
             entityTypes: ['소상공인'],
@@ -437,6 +442,7 @@ export const mockPolicies: Policy[] = [
         dDay: 60,
         applicationPeriod: '2026년 2월 1일 ~ 4월 30일',
         agency: '중소벤처기업부 / 중소기업기술정보진흥원',
+        sourcePlatform: 'SMTECH',
 
         criteria: {
             entityTypes: ['중소기업'],
@@ -545,6 +551,7 @@ export const mockPolicies: Policy[] = [
         dDay: 30,
         applicationPeriod: '2026년 3월 예정',
         agency: '중소벤처기업부 (창업진흥원)',
+        sourcePlatform: 'K-Startup',
         criteria: {
             entityTypes: ['예비창업자'],
             ageGroups: [],
@@ -576,6 +583,7 @@ export const mockPolicies: Policy[] = [
         dDay: 30,
         applicationPeriod: '2026년 2월 ~ 2026년 3월',
         agency: '중소벤처기업부 (창업진흥원)',
+        sourcePlatform: 'K-Startup',
         criteria: {
             entityTypes: ['소상공인', '중소기업'],
             businessPeriods: ['1년 미만', '1-3년'],
@@ -592,6 +600,7 @@ export const mockPolicies: Policy[] = [
         dDay: 30,
         applicationPeriod: '2026년 2월 ~ 2026년 3월',
         agency: '중소벤처기업부 (창업진흥원)',
+        sourcePlatform: 'K-Startup',
         criteria: {
             entityTypes: ['중소기업'],
             businessPeriods: ['3-7년'],
@@ -608,6 +617,7 @@ export const mockPolicies: Policy[] = [
         dDay: 30,
         applicationPeriod: '2026년 2월 ~ 2026년 3월',
         agency: '중소벤처기업부 (중진공)',
+        sourcePlatform: 'K-Startup',
         criteria: {
             entityTypes: ['예비창업자', '소상공인', '중소기업'],
             ageGroups: ['청년 (39세 이하)'],
@@ -624,6 +634,7 @@ export const mockPolicies: Policy[] = [
         dDay: 15,
         applicationPeriod: '2026년 2월 말 마감',
         agency: '중소벤처기업부',
+        sourcePlatform: 'K-Startup',
         criteria: {
             entityTypes: ['중소기업'],
             industries: ['IT', '제조업'],

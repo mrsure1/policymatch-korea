@@ -14,6 +14,31 @@ export function usePolicies(profile: UserProfile, options?: { skipFiltering?: bo
     const [error, setError] = useState<string | null>(null);
     const [source, setSource] = useState<'api' | 'none'>('api');
 
+    const normalizeTitle = (title: string) => {
+        if (!title) return title;
+        let normalized = title.trim();
+        // Fix duplicated brackets like "[[기관] 제목" -> "[기관] 제목"
+        normalized = normalized.replace(/\[\[/g, '[').replace(/\]\]/g, ']');
+
+        // If opening bracket exists without a matching closing bracket, remove the opener
+        if (normalized.startsWith('[') && !normalized.includes(']')) {
+            normalized = normalized.replace('[', '');
+        }
+        if (normalized.startsWith('(') && !normalized.includes(')')) {
+            normalized = normalized.replace('(', '');
+        }
+
+        // If closing bracket exists without an opener, remove the closer
+        if (normalized.includes(']') && !normalized.includes('[')) {
+            normalized = normalized.replace(']', '');
+        }
+        if (normalized.includes(')') && !normalized.includes('(')) {
+            normalized = normalized.replace(')', '');
+        }
+
+        return normalized;
+    };
+
     useEffect(() => {
         async function fetchPolicies() {
             setLoading(true);
@@ -24,7 +49,10 @@ export function usePolicies(profile: UserProfile, options?: { skipFiltering?: bo
                 const result = await response.json();
 
                 if (result.success && result.data) {
-                    const allData = result.data;
+                    const allData = result.data.map((policy: Policy) => ({
+                        ...policy,
+                        title: normalizeTitle(policy.title || ''),
+                    }));
 
                     if (options?.skipFiltering) {
                         // 필터링 없이 전체 반환
@@ -63,8 +91,58 @@ export function usePolicies(profile: UserProfile, options?: { skipFiltering?: bo
 
                             return regionMatch && industryMatch && ageMatch && periodMatch && entityMatch;
                         });
+                        const genericTokens = ['전체', '전국', '제한없음', '무관'];
 
-                        setPolicies(filteredData);
+                        const scoredData = filteredData.map((policy: Policy) => {
+                            const criteria = policy.criteria || {};
+
+                            const hasMeaningfulList = (list?: string[]) => {
+                                if (!list || list.length === 0) return false;
+                                return !list.some((v) => genericTokens.includes(v));
+                            };
+
+                            const regionScore = hasMeaningfulList(criteria.regions)
+                                && criteria.regions!.some((r) => profile.region.includes(r))
+                                ? 1 : 0;
+
+                            const industryScore = hasMeaningfulList(criteria.industries)
+                                && criteria.industries!.some((i) => profile.industry.includes(i) || i === '기타')
+                                ? 1 : 0;
+
+                            const ageScore = hasMeaningfulList(criteria.ageGroups)
+                                && criteria.ageGroups!.includes(profile.age as any)
+                                ? 1 : 0;
+
+                            const periodScore = hasMeaningfulList(criteria.businessPeriods)
+                                && criteria.businessPeriods!.includes(profile.businessPeriod as any)
+                                ? 1 : 0;
+
+                            const entityScore = hasMeaningfulList(criteria.entityTypes)
+                                && criteria.entityTypes!.includes(profile.entityType as any)
+                                ? 1 : 0;
+
+                            const score = regionScore + industryScore + ageScore + periodScore + entityScore;
+                            const meaningfulCount =
+                                (hasMeaningfulList(criteria.regions) ? 1 : 0) +
+                                (hasMeaningfulList(criteria.industries) ? 1 : 0) +
+                                (hasMeaningfulList(criteria.ageGroups) ? 1 : 0) +
+                                (hasMeaningfulList(criteria.businessPeriods) ? 1 : 0) +
+                                (hasMeaningfulList(criteria.entityTypes) ? 1 : 0);
+
+                            const isGeneric = meaningfulCount === 0;
+                            const scoreRatio = meaningfulCount > 0 ? score / meaningfulCount : 0;
+
+                            return { policy, score, scoreRatio, isGeneric };
+                        });
+
+                        scoredData.sort((a, b) => {
+                            if (a.isGeneric !== b.isGeneric) return a.isGeneric ? 1 : -1;
+                            if (b.scoreRatio !== a.scoreRatio) return b.scoreRatio - a.scoreRatio;
+                            if (b.score !== a.score) return b.score - a.score;
+                            return 0;
+                        });
+
+                        setPolicies(scoredData.map((item) => item.policy));
                     }
 
                     setSource('api');

@@ -43,143 +43,101 @@ export default function OnboardingForm() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-2xl">
+        <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden flex items-center justify-center p-4">
+            <div className="pointer-events-none absolute inset-0 bg-[url('/bg-mesh.svg')] bg-cover opacity-70" />
+            <div className="pointer-events-none absolute inset-0 bg-[url('/texture-grid.svg')] bg-cover opacity-50 mix-blend-soft-light" />
+            <div className="w-full max-w-3xl relative z-10">
                 {/* Hero Screen - Step 0 */}
                 {step === 0 && (
-                    <div className="bg-white rounded-3xl shadow-2xl p-8 text-center animate-fade-in">
-                        <div className="mb-6">
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 mb-4 shadow-lg">
-                                <Sparkles className="w-8 h-8 text-white" />
+                    <div className="glass-card rounded-2xl p-10 text-center animate-fade-in text-slate-900">
+                        <div className="mb-10">
+                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-500 mb-6 shadow-md">
+                                <Building2 className="w-8 h-8 text-white" />
                             </div>
-                            <h1 className="text-3xl font-bold text-slate-900 mb-3 leading-tight">
-                                나에게 딱 맞는<br />정책자금 찾기
+                            <h1 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight leading-tight">
+                                대한민국 정책자금<br />
+                                <span className="text-sky-600">맞춤 매칭 서비스</span>
                             </h1>
-                            <p className="text-base text-slate-600 mb-6 leading-relaxed">
-                                간단한 질문 5개로<br />
-                                맞춤형 정부 지원 정책을 추천해드려요
+                            <p className="text-lg text-slate-600 mb-8 leading-relaxed max-w-xl mx-auto">
+                                복잡하고 어려운 정부 지원사업,<br />
+                                기업 프로필을 분석하여 귀사에 최적화된 공고를 찾아드립니다.
                             </p>
-                        </div>
 
-                        <div className="grid grid-cols-3 gap-3 mb-6 text-left">
-                            <div className="bg-blue-50 rounded-xl p-3">
-                                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center mb-2">
-                                    <TrendingUp className="w-4 h-4 text-blue-600" />
+                            <div className="flex flex-wrap justify-center gap-4 mb-10">
+                                <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-slate-100">
+                                    <TrendingUp className="w-4 h-4 text-slate-500" />
+                                    <span className="text-sm font-medium text-slate-700">실시간 데이터 분석</span>
                                 </div>
-                                <p className="text-xs font-semibold text-slate-900">정확한 매칭</p>
-                                <p className="text-xs text-slate-600 mt-0.5">AI 기반 추천</p>
-                            </div>
-                            <div className="bg-indigo-50 rounded-xl p-3">
-                                <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center mb-2">
-                                    <FileText className="w-4 h-4 text-indigo-600" />
+                                <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-slate-100">
+                                    <FileText className="w-4 h-4 text-slate-500" />
+                                    <span className="text-sm font-medium text-slate-700">2026년 최신 공고 반영</span>
                                 </div>
-                                <p className="text-xs font-semibold text-slate-900">신청 가이드</p>
-                                <p className="text-xs text-slate-600 mt-0.5">단계별 안내</p>
-                            </div>
-                            <div className="bg-purple-50 rounded-xl p-3">
-                                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center mb-2">
-                                    <Sparkles className="w-4 h-4 text-purple-600" />
+                                <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-slate-100">
+                                    <Sparkles className="w-4 h-4 text-slate-500" />
+                                    <span className="text-sm font-medium text-slate-700">100% 무료 서비스</span>
                                 </div>
-                                <p className="text-xs font-semibold text-slate-900">무료 서비스</p>
-                                <p className="text-xs text-slate-600 mt-0.5">100% 무료</p>
                             </div>
                         </div>
 
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-4 max-w-md mx-auto">
                             <button
                                 onClick={handleNext}
-                                className="w-full px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-bold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
+                                className="w-full px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-full hover:bg-slate-800 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                             >
-                                시작하기
+                                무료로 매칭 시작하기
                                 <ChevronRight className="w-5 h-5" />
                             </button>
                             <Link
                                 href="/archive"
-                                className="text-sm text-slate-500 hover:text-blue-600 underline decoration-slate-300 underline-offset-4 transition-colors"
+                                className="text-sm text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center gap-1"
                             >
-                                전체 공고 모아보기 (자료실)
+                                전체 공고 리스트 둘러보기
+                                <ChevronRight className="w-3 h-3" />
                             </Link>
                         </div>
-                        <p className="text-xs text-slate-400 mt-2">소요시간: 약 1분</p>
                     </div>
                 )}
 
                 {/* Question Steps - 1 to 5 */}
                 {step > 0 && (
-                    <div className="bg-white rounded-3xl shadow-2xl p-8 animate-fade-in">
-                        {/* Selection History */}
-                        {step > 1 && (
-                            <div className="mb-6 flex flex-wrap gap-2 animate-fade-in">
-                                <span className="text-xs font-semibold text-slate-500 flex items-center mr-1">선택 내역:</span>
-                                {step > 1 && profile.entityType && (
-                                    <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100 flex items-center">
-                                        <Building2 className="w-3 h-3 mr-1.5" />
-                                        {profile.entityType}
-                                    </div>
-                                )}
-                                {step > 2 && profile.age && (
-                                    <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100 flex items-center">
-                                        <User className="w-3 h-3 mr-1.5" />
-                                        {profile.age}
-                                    </div>
-                                )}
-                                {step > 3 && profile.region && (
-                                    <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100 flex items-center">
-                                        <MapPin className="w-3 h-3 mr-1.5" />
-                                        {profile.region}
-                                    </div>
-                                )}
-                                {step > 4 && profile.industry && (
-                                    <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100 flex items-center">
-                                        <Briefcase className="w-3 h-3 mr-1.5" />
-                                        {profile.industry}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Progress Bar */}
-                        <div className="mb-8">
-                            <div className="flex justify-between items-center mb-3">
-                                <span className="text-sm font-semibold text-slate-700">
-                                    질문 {step} / {totalSteps}
-                                </span>
-                                <span className="text-sm font-bold text-blue-600">
-                                    {Math.round((step / totalSteps) * 100)}%
+                    <div className="glass-card rounded-2xl p-5 sm:p-6 animate-fade-in text-slate-900">
+                        {/* Header & Progress */}
+                        <div className="mb-4">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold text-slate-900">기업 프로필 설정</h2>
+                                <span className="text-sm font-medium text-slate-500">
+                                    {step} / {totalSteps}
                                 </span>
                             </div>
-                            <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                            <div className="w-full h-1.5 bg-slate-200/60 rounded-full overflow-hidden">
                                 <div
-                                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500 ease-out rounded-full"
+                                    className="h-full bg-slate-900 transition-all duration-300 ease-out rounded-full"
                                     style={{ width: `${(step / totalSteps) * 100}%` }}
                                 />
                             </div>
                         </div>
 
                         {/* Step Content */}
-                        <div className="mb-8">
+                        <div className="mb-3 min-h-[120px]">
                             {step === 1 && (
                                 <div className="animate-slide-in">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-md">
-                                            <Building2 className="w-8 h-8 text-blue-600" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-3xl font-bold text-slate-900">사업자 유형</h2>
-                                            <p className="text-slate-600 mt-1">어떤 형태로 사업을 하고 계신가요?</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-4 mt-6">
+                                    <h3 className="text-2xl font-bold text-slate-900 mb-2">어떤 유형으로 사업 중이신가요?</h3>
+                                    <p className="text-slate-500 mb-5">가장 적합한 유형을 선택해주세요.</p>
+
+                                    <div className="grid grid-cols-1 gap-3">
                                         {ENTITY_TYPES.map((type) => (
                                             <button
                                                 key={type}
                                                 onClick={() => updateProfile({ entityType: type })}
-                                                className={`p-5 rounded-2xl border-2 text-left transition-all transform hover:scale-102 ${profile.entityType === type
-                                                    ? 'border-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md'
-                                                    : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
+                                                className={`p-4 rounded-xl border text-left transition-all ${profile.entityType === type
+                                                    ? 'border-slate-900 bg-slate-900/10 text-slate-900 ring-1 ring-slate-900/30'
+                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700'
                                                     }`}
                                             >
-                                                <span className="text-lg font-bold text-slate-900">{type}</span>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-base font-bold">{type}</span>
+                                                    {profile.entityType === type && <div className="w-3 h-3 rounded-full bg-slate-900" />}
+                                                </div>
                                             </button>
                                         ))}
                                     </div>
@@ -188,26 +146,23 @@ export default function OnboardingForm() {
 
                             {step === 2 && (
                                 <div className="animate-slide-in">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-md">
-                                            <User className="w-8 h-8 text-blue-600" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-3xl font-bold text-slate-900">연령대</h2>
-                                            <p className="text-slate-600 mt-1">연령대를 선택해주세요</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-4 mt-6">
+                                    <h3 className="text-2xl font-bold text-slate-900 mb-2">대표자 연령대는 어떻게 되시나요?</h3>
+                                    <p className="text-slate-500 mb-5">청년 창업 지원 등 연령별 우대 정책 매칭에 활용됩니다.</p>
+
+                                    <div className="grid grid-cols-1 gap-3">
                                         {AGE_GROUPS.map((age) => (
                                             <button
                                                 key={age}
                                                 onClick={() => updateProfile({ age })}
-                                                className={`p-5 rounded-2xl border-2 text-left transition-all transform hover:scale-102 ${profile.age === age
-                                                    ? 'border-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md'
-                                                    : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
+                                                className={`p-4 rounded-xl border text-left transition-all ${profile.age === age
+                                                    ? 'border-slate-900 bg-slate-900/10 text-slate-900 ring-1 ring-slate-900/30'
+                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700'
                                                     }`}
                                             >
-                                                <span className="text-lg font-bold text-slate-900">{age}</span>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-base font-bold">{age}</span>
+                                                    {profile.age === age && <div className="w-3 h-3 rounded-full bg-slate-900" />}
+                                                </div>
                                             </button>
                                         ))}
                                     </div>
@@ -216,26 +171,20 @@ export default function OnboardingForm() {
 
                             {step === 3 && (
                                 <div className="animate-slide-in">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-md">
-                                            <MapPin className="w-8 h-8 text-blue-600" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-3xl font-bold text-slate-900">사업장 지역</h2>
-                                            <p className="text-slate-600 mt-1">사업장이 위치한 지역을 선택해주세요</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mt-6">
+                                    <h3 className="text-2xl font-bold text-slate-900 mb-2">사업장은 어디에 위치해 있나요?</h3>
+                                    <p className="text-slate-500 mb-5">해당 지역의 지자체 지원사업을 찾아드립니다.</p>
+
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[200px] sm:max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
                                         {REGIONS.map((region) => (
                                             <button
                                                 key={region}
                                                 onClick={() => updateProfile({ region })}
-                                                className={`p-3 rounded-xl border-2 text-center transition-all transform hover:scale-105 ${profile.region === region
-                                                    ? 'border-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md'
-                                                    : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
+                                                className={`py-2 px-2 rounded-lg border text-center text-sm transition-all ${profile.region === region
+                                                    ? 'border-slate-900 bg-slate-900 text-white font-bold shadow-md'
+                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700 font-medium hover:bg-slate-50'
                                                     }`}
                                             >
-                                                <span className="text-sm font-bold text-slate-900">{region}</span>
+                                                {region}
                                             </button>
                                         ))}
                                     </div>
@@ -244,26 +193,20 @@ export default function OnboardingForm() {
 
                             {step === 4 && (
                                 <div className="animate-slide-in">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-md">
-                                            <Briefcase className="w-8 h-8 text-blue-600" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-3xl font-bold text-slate-900">업종</h2>
-                                            <p className="text-slate-600 mt-1">주요 업종을 선택해주세요</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4 mt-6 max-h-[280px] overflow-y-auto pr-2">
+                                    <h3 className="text-2xl font-bold text-slate-900 mb-2">주력 업종은 무엇인가요?</h3>
+                                    <p className="text-slate-500 mb-5">업종별 특화 지원사업 매칭에 필요합니다.</p>
+
+                                    <div className="grid grid-cols-2 gap-3 max-h-[190px] sm:max-h-[230px] overflow-y-auto pr-1 custom-scrollbar">
                                         {INDUSTRIES.map((industry) => (
                                             <button
                                                 key={industry}
                                                 onClick={() => updateProfile({ industry })}
-                                                className={`p-5 rounded-2xl border-2 text-center transition-all transform hover:scale-105 ${profile.industry === industry
-                                                    ? 'border-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md'
-                                                    : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
+                                                className={`p-3 rounded-xl border text-center text-sm transition-all ${profile.industry === industry
+                                                    ? 'border-slate-900 bg-slate-900/10 text-slate-900 ring-1 ring-slate-900/30 font-bold'
+                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700 font-medium'
                                                     }`}
                                             >
-                                                <span className="text-lg font-bold text-slate-900">{industry}</span>
+                                                {industry}
                                             </button>
                                         ))}
                                     </div>
@@ -272,26 +215,23 @@ export default function OnboardingForm() {
 
                             {step === 5 && (
                                 <div className="animate-slide-in">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-md">
-                                            <Calendar className="w-8 h-8 text-blue-600" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-3xl font-bold text-slate-900">사업 기간</h2>
-                                            <p className="text-slate-600 mt-1">사업을 시작한 지 얼마나 되셨나요?</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-4 mt-6 max-h-[280px] overflow-y-auto pr-2">
+                                    <h3 className="text-2xl font-bold text-slate-900 mb-2">사업을 시작한 지 얼마나 되셨나요?</h3>
+                                    <p className="text-slate-500 mb-5">창업 초기, 도약기 등 단계별 맞춤 지원을 추천해드립니다.</p>
+
+                                    <div className="grid grid-cols-1 gap-3">
                                         {BUSINESS_PERIODS.map((period) => (
                                             <button
                                                 key={period}
                                                 onClick={() => updateProfile({ businessPeriod: period })}
-                                                className={`p-5 rounded-2xl border-2 text-left transition-all transform hover:scale-102 ${profile.businessPeriod === period
-                                                    ? 'border-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md'
-                                                    : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
+                                                className={`p-4 rounded-xl border text-left transition-all ${profile.businessPeriod === period
+                                                    ? 'border-slate-900 bg-slate-900/10 text-slate-900 ring-1 ring-slate-900/30'
+                                                    : 'border-slate-200 hover:border-slate-400 text-slate-700'
                                                     }`}
                                             >
-                                                <span className="text-lg font-bold text-slate-900">{period}</span>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-base font-bold">{period}</span>
+                                                    {profile.businessPeriod === period && <div className="w-3 h-3 rounded-full bg-slate-900" />}
+                                                </div>
                                             </button>
                                         ))}
                                     </div>
@@ -300,25 +240,25 @@ export default function OnboardingForm() {
                         </div>
 
                         {/* Navigation Buttons */}
-                        <div className="flex gap-4">
+                        <div className="flex gap-3 pt-4 border-t border-slate-100">
                             {step > 0 && (
                                 <button
                                     onClick={handleBack}
-                                    className="px-6 py-4 rounded-xl border-2 border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition-all hover:shadow-md"
+                                    className="px-6 py-3 rounded-lg text-slate-600 font-medium hover:bg-slate-100 transition-colors"
                                 >
-                                    이전
+                                    이전으로
                                 </button>
                             )}
                             <button
                                 onClick={handleNext}
                                 disabled={!isStepValid()}
-                                className={`flex-1 px-8 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all transform ${isStepValid()
-                                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl hover:scale-105'
+                                className={`flex-1 px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${isStepValid()
+                                    ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-md'
                                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                     }`}
                             >
-                                {step === totalSteps ? '결과 보기' : '다음'}
-                                {step < totalSteps && <ChevronRight className="w-6 h-6" />}
+                                {step === totalSteps ? '맞춤 정책 확인하기' : '다음 단계'}
+                                {step < totalSteps && <ChevronRight className="w-5 h-5" />}
                             </button>
                         </div>
                     </div>

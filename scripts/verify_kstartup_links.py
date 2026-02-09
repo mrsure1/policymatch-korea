@@ -7,6 +7,7 @@ sys.path.insert(0, str(project_root))
 
 from lib.db.supabase_client import SupabaseClient
 import requests
+import time
 
 client = SupabaseClient()
 
@@ -29,9 +30,18 @@ for i, p in enumerate(result.data, 1):
     
     # 실제 링크 테스트
     test_url = url if url else link
+    if test_url.startswith("http://"):
+        test_url = test_url.replace("http://", "https://", 1)
     if test_url:
         try:
-            response = requests.get(test_url, timeout=5, allow_redirects=True)
+            response = requests.get(
+                test_url,
+                timeout=10,
+                allow_redirects=True,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36"
+                },
+            )
             print(f"HTTP Status: {response.status_code}")
             print(f"Final URL: {response.url}")
             
@@ -50,5 +60,6 @@ for i, p in enumerate(result.data, 1):
                 print(f"❌ 링크 오류 - Status {response.status_code}")
         except Exception as e:
             print(f"❌ 링크 접근 실패: {e}")
+    time.sleep(1.5)
 
 print("\n" + "=" * 80)
