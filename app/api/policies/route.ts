@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
-import JSZip from 'jszip'
-import { PDFParse } from 'pdf-parse'
+// Edge 런타임에서는 Node 전용 모듈을 사용할 수 없어 첨부파일 파싱은 비활성화
 import { getSupabaseClient } from '@/lib/supabase/client'
 import type { PolicyFundDB } from '@/lib/supabase/client'
 import type { Policy, PolicyDocument, PolicyRoadmapStep } from '@/lib/mockPolicies'
-export const runtime = 'nodejs'
+export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
@@ -943,49 +942,9 @@ function extractDocumentsFromPdfText(text: string): PolicyDocument[] {
     }))
 }
 
-async function extractRoadmapDocumentsFromAttachmentUrl(url: string): Promise<{ roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] }> {
-    try {
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
-            },
-        })
-        if (!response.ok) return { roadmap: [], documents: [] }
-        const buffer = Buffer.from(await response.arrayBuffer())
-        const header = buffer.slice(0, 4).toString('utf8')
-
-        if (header.startsWith('PK')) {
-            const zip = await JSZip.loadAsync(buffer)
-            const sectionFile =
-                zip.file(/Contents\/section0\.xml/i)[0] ||
-                zip.file(/Contents\/section\d+\.xml/i)[0]
-            if (!sectionFile) return { roadmap: [], documents: [] }
-            const xml = await sectionFile.async('string')
-            const lines = extractHwpxTextLines(xml)
-            return {
-                roadmap: extractRoadmapFromHwpxLines(lines),
-                documents: extractDocumentsFromHwpxLines(lines),
-            }
-        }
-
-        if (header.startsWith('%PDF')) {
-            const parser = new PDFParse({ data: buffer })
-            try {
-                const parsed = await parser.getText()
-                const text = parsed.text || ''
-                return {
-                    roadmap: extractRoadmapFromPdfText(text),
-                    documents: extractDocumentsFromPdfText(text),
-                }
-            } finally {
-                await parser.destroy()
-            }
-        }
-
-        return { roadmap: [], documents: [] }
-    } catch {
-        return { roadmap: [], documents: [] }
-    }
+async function extractRoadmapDocumentsFromAttachmentUrl(_url: string): Promise<{ roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] }> {
+    // Edge 런타임에서는 PDF/HWPX 파서가 동작하지 않아 첨부파일 파싱은 건너뜁니다.
+    return { roadmap: [], documents: [] }
 }
 
 async function mapWithLimit<T, R>(items: T[], limit: number, mapper: (item: T, index: number) => Promise<R>): Promise<R[]> {
