@@ -993,6 +993,22 @@ async function mapWithLimit<T, R>(items: T[], limit: number, mapper: (item: T, i
     return results
 }
 
+function isKStartupPolicy(policy: Policy): boolean {
+    const url = (policy.url || '').toLowerCase()
+    const source = (policy.sourcePlatform || '').toLowerCase()
+    return url.includes('k-startup.go.kr') || source.includes('k-startup')
+}
+
+function isKStartupViewUrl(url?: string | null): boolean {
+    if (!url) return false
+    const lower = url.toLowerCase()
+    return lower.includes('k-startup.go.kr') && (lower.includes('schm=view') || /pbancsn=\d+/.test(lower)) && !lower.includes('schm=list')
+}
+
+function normalizeTitleKey(title: string): string {
+    return sanitizePolicyTitle(title).toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
 function normalizeKStartupUrl(
     rawUrl: string | null | undefined,
     title: string,
@@ -1275,13 +1291,47 @@ export async function GET() {
             return mapped
         })
 
-        console.log(`✅ Fetched ${policies.length} policies, IDs:`, policies.map(p => p.id))
+        
+        const kstartupBestByTitle = new Map<string, Policy>()
+        for (const policy of policies) {
+            if (!isKStartupPolicy(policy)) continue
+            const key = normalizeTitleKey(policy.title)
+            if (!key) continue
+            const best = kstartupBestByTitle.get(key)
+            if (!best) {
+                kstartupBestByTitle.set(key, policy)
+                continue
+            }
+            if (isKStartupViewUrl(policy.url) && !isKStartupViewUrl(best.url)) {
+                kstartupBestByTitle.set(key, policy)
+            }
+        }
+
+        const seenKstartupTitles = new Set<string>()
+        const normalizedPolicies = policies.map((policy) => {
+            if (!isKStartupPolicy(policy)) return policy
+            const key = normalizeTitleKey(policy.title)
+            const best = kstartupBestByTitle.get(key)
+            if (best?.url && policy.url !== best.url) {
+                policy.url = best.url
+            }
+            return policy
+        }).filter((policy) => {
+            if (!isKStartupPolicy(policy)) return true
+            const key = normalizeTitleKey(policy.title)
+            if (!key) return true
+            if (seenKstartupTitles.has(key)) return false
+            seenKstartupTitles.add(key)
+            return true
+        })
+
+        console.log(`? Fetched ${normalizedPolicies.length} policies, IDs:`, normalizedPolicies.map(p => p.id))
 
         return NextResponse.json(
             {
                 success: true,
-                data: policies,
-                count: policies.length,
+                data: normalizedPolicies,
+                count: normalizedPolicies.length,
                 error: null,
             },
             { headers: NO_CACHE_HEADERS }
