@@ -1,5 +1,18 @@
 ﻿import type { PolicyRoadmapStep, PolicyDocument } from '@/lib/mockPolicies';
 
+// Helper to strip HTML and clean text
+function stripHtml(html: string): string {
+    if (!html) return '';
+    return html
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, '\n') // Replace tags with newlines to preserve structure
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/[ \t]+/g, ' ') // Collapse spaces but keep newlines
+        .replace(/\n\s*\n/g, '\n') // Collapse multiple newlines
+        .trim();
+}
+
 export function getPolicySummary(summary: string | undefined, detailContent?: string): string {
     // 1. If valid summary exists, use it
     if (summary && summary.trim().length > 10 && !summary.includes('요약정보가 없습니다')) return summary;
@@ -7,13 +20,8 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
     if (!detailContent) return '';
 
     // 2. Strip HTML tags and clean whitespace
-    const stripped = detailContent
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/gi, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    // Use the helper but optimize for single line summary vs structured text
+    const stripped = stripHtml(detailContent).replace(/\n/g, ' ');
 
     if (!stripped) return '';
 
@@ -69,7 +77,7 @@ function parseJsonValue(value: unknown): unknown {
 }
 
 const DOCUMENT_EXCLUDE_PATTERN = /제출하신\s*서류는\s*사업운영기관에서\s*관리되오니.*$/i;
-const ROADMAP_SPLIT_PATTERN = /\s*(?:,|，|·|ㆍ|;|\/|및|그리고)\s*/g;
+const ROADMAP_SPLIT_PATTERN = /\s*(?:,|，|·|ㆍ|;|\/|및|그리고|→|->)\s*/g;
 const DOCUMENT_KEYWORD_PATTERN = /(신청서|계획서|동의서|증명서|확약서|등록증|등본|명부|보고서|제안서|서류|자료|증빙)/;
 
 function splitTextItems(text: string): string[] {
@@ -117,6 +125,12 @@ function splitRoadmapItems(text: string): string[] {
     cleaned = cleaned.replace(/\([^)]*참조[^)]*\)/g, ' ');
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
     if (!cleaned) return [];
+
+    // If text looks like "1. Step 2. Step 3. Step"
+    if (/\d+\./.test(cleaned)) {
+        return cleaned.split(/\d+\./).map(s => s.trim()).filter(Boolean);
+    }
+
     return cleaned
         .split(ROADMAP_SPLIT_PATTERN)
         .map((item) =>
@@ -188,22 +202,25 @@ export function getRoadmapSteps(roadmap: PolicyRoadmapStep[] | undefined, detail
 
     if (!detailContent) return [];
 
+    const stripped = stripHtml(detailContent);
+
     // 1. Try to find "선정절차", "평가방법", "절차" section
     const roadmapKeywords = ['선정절차 및 평가방법', '선정절차', '평가방법', '평가절차', '신청절차', '진행절차'];
     let roadmapText = '';
 
     for (const keyword of roadmapKeywords) {
-        const regex = new RegExp(`${keyword}[^\\n]*\\n+([\\s\\S]*?)(?:\\n\\n|$)`, 'i');
-        const match = detailContent.match(regex);
+        // Updated regex to handle "Header \n Content" or "Header : Content"
+        // And stop at next header-like line
+        const regex = new RegExp(`${keyword}[:\\s]*(?:\\n|\\s|$)([\\s\\S]*?)(?:\\n[가-힣]+(?:절차|방법|안내|문의|사항|서류)|$)`, 'i');
+        const match = stripped.match(regex);
         if (match && match[1]) {
-            roadmapText = match[1].trim();
-            break;
+            const candidate = match[1].trim();
+            // Filter out obvious noise?
+            if (candidate.length > 5) {
+                roadmapText = candidate;
+                break;
+            }
         }
-    }
-
-    if (!roadmapText && detailContent.length > 0) {
-        // Fallback: try to find lines that look like steps (1. 2. 3. or - - -) if content is short enough to be just the roadmap?
-        // Or just don't guess too wildly to avoid noise.
     }
 
     if (roadmapText) {
@@ -224,15 +241,16 @@ export function getRequiredDocuments(documents: PolicyDocument[] | undefined, de
 
     if (!detailContent) return [];
 
+    const stripped = stripHtml(detailContent);
+
     // 2. Try to find "제출서류", "신청서류", "구비서류" section
-    const docKeywords = ['제출서류', '신청서류', '구비서류', '필수서류'];
+    const docKeywords = ['제출서류', '신청서류', '구비서류', '필수서류', '신청 시 요청하는 정보'];
     let docText = '';
 
     // Look for section headers
     for (const keyword of docKeywords) {
-        // Find keyword followed by content, stopping at next double newline or end of common sections
-        const regex = new RegExp(`${keyword}[^\\n]*\\n+([\\s\\S]*?)(?:\\n\\n|\\n[가-힣]+(?:절차|방법|안내|문의)|$)`, 'i');
-        const match = detailContent.match(regex);
+        const regex = new RegExp(`${keyword}[:\\s]*(?:\\n|\\s|$)([\\s\\S]*?)(?:\\n[가-힣]+(?:절차|방법|안내|문의|사항|서류)|\\n\\d+\\.|$)`, 'i');
+        const match = stripped.match(regex);
         if (match && match[1]) {
             docText = match[1].trim();
             break;
@@ -243,6 +261,7 @@ export function getRequiredDocuments(documents: PolicyDocument[] | undefined, de
         // Remove common disclaimer text in document section
         docText = docText.replace(/제출하신\s*서류는\s*사업운영기관에서\s*관리되오니.*$/i, '');
         docText = docText.replace(/인베스트 경기 지침 참고/g, ''); // Specific noise removal
+        docText = docText.replace(/개인정보포함/g, ''); // User screenshot specific
 
         const docNames = splitDocumentName(docText);
         return docNames.map((name) => ({
