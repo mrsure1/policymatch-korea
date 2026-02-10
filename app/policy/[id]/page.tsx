@@ -5,6 +5,7 @@ import { useUserProfileStore } from '@/lib/store';
 import { usePolicies } from '@/lib/hooks/usePolicies';
 import RoadmapTimeline from '@/components/RoadmapTimeline';
 import DocumentChecklist from '@/components/DocumentChecklist';
+import { getDocumentCount, getRoadmapCount } from '@/lib/utils/policyCounts';
 import { ArrowLeft, Calendar, Building2, TrendingUp, MapPin, FileCheck, Loader2, ExternalLink, AlertTriangle, Info, Map } from 'lucide-react';
 export const runtime = 'edge'
 
@@ -105,6 +106,35 @@ export default function PolicyDetailPage() {
 
     const source = getSourceMeta()
 
+    const splitSummaryItems = (summary: string) => {
+        const raw = (summary || '').replace(/\r/g, '\n').trim()
+        if (!raw) return []
+
+        const bulletSplit = raw
+            .split(/\n+|[•·ㆍ\u2022]+/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+        if (bulletSplit.length > 1) return bulletSplit
+
+        const dividerSplit = raw
+            .split(/\s*(?:\/|\||;)\s*/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+        if (dividerSplit.length > 1) return dividerSplit
+
+        const sentenceNormalized = raw
+            .replace(/([.!?])\s+/g, '$1\n')
+            .replace(/(다\.|요\.|함\.|됨\.|임\.|니다\.|습니다\.|됩니다\.)\s+/g, '$1\n')
+        const sentenceSplit = sentenceNormalized
+            .split(/\n+/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+
+        return sentenceSplit.length > 1 ? sentenceSplit : [raw]
+    }
+
+    const summaryItems = splitSummaryItems(policy.summary)
+
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
             <div className="pointer-events-none absolute inset-0 bg-[url('/bg-mesh.svg')] bg-cover opacity-70" />
@@ -193,7 +223,17 @@ export default function PolicyDetailPage() {
                         <TrendingUp className="w-5 h-5 text-sky-600" />
                         주요 정보 요약
                     </h2>
-                    <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{policy.summary}</p>
+                    {summaryItems.length > 0 ? (
+                        <ul className="list-disc pl-5 space-y-1 text-slate-700">
+                            {summaryItems.map((item, index) => (
+                                <li key={`${item}-${index}`} className="leading-relaxed">
+                                    {item}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-slate-500">요약 정보가 없습니다.</p>
+                    )}
                     <p className="text-xs text-slate-400 mt-2 mb-6 text-right">출처: {policy.agency}</p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -325,25 +365,15 @@ export default function PolicyDetailPage() {
                     </div>
                 ) : null}
 
-                {/* 4. Disclaimer */}
-                <div className="flex items-start gap-3 bg-amber-50/90 border border-amber-200 p-4 rounded-2xl text-sm text-amber-900">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                        <span className="font-bold block mb-1">주의사항</span>
-                        본 서비스는 공공데이터를 기반으로 정보를 제공하며, 실제 공고 내용과 차이가 있을 수 있습니다.
-                        법적 효력이 있는 정확한 내용은 반드시 위 <strong>[공고문 보러가기]</strong> 버튼을 통해 원문에서 확인하시기 바랍니다.
-                    </div>
-                </div>
-
                 {/* 5. Action Roadmap */}
-                {policy.roadmap && policy.roadmap.length > 0 && (
+                {policy.roadmap && getRoadmapCount(policy.roadmap) > 0 && (
                     <div className="glass-card rounded-2xl p-6 text-slate-900">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                                 <Map className="w-5 h-5 text-blue-600" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900">신청 로드맵 ({policy.roadmap.length}단계)</h2>
+                                <h2 className="text-lg font-bold text-slate-900">신청 로드맵 ({getRoadmapCount(policy.roadmap)}단계)</h2>
                                 <p className="text-xs text-slate-500">단계별 신청 절차를 안내합니다</p>
                             </div>
                         </div>
@@ -352,20 +382,32 @@ export default function PolicyDetailPage() {
                 )}
 
                 {/* 6. Required Documents */}
-                {policy.documents && policy.documents.length > 0 && (
+                {policy.documents && getDocumentCount(policy.documents) > 0 && (
                     <div className="glass-card rounded-2xl p-6 text-slate-900">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
                                 <FileCheck className="w-5 h-5 text-green-600" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900">필요 서류 ({policy.documents.length}개)</h2>
+                                <h2 className="text-lg font-bold text-slate-900">필요 서류 ({getDocumentCount(policy.documents)}개)</h2>
                                 <p className="text-xs text-slate-500">신청 시 필요한 서류를 확인하세요</p>
                             </div>
                         </div>
                         <DocumentChecklist documents={policy.documents} />
                     </div>
                 )}
+
+                {/* 주의사항 */}
+                <div className="flex items-start gap-3 bg-amber-50/90 border border-amber-200 p-4 rounded-2xl text-sm text-amber-900">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                        <span className="font-bold block mb-1">????</span>
+                        ? ???? ?????? ???? ??? ????, ?? ?? ??? ??? ?? ? ????.
+                        ?? ??? ?? ??? ??? ??? <strong>[??? ????]</strong> ??? ?? ???? ????? ????.
+                    </div>
+                </div>
+
+
             </div>
         </div>
     );

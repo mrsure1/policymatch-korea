@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Policy } from '@/lib/mockPolicies';
 import { Clock, TrendingUp, ExternalLink } from 'lucide-react';
+import { getDocumentCount, getRoadmapCount } from '@/lib/utils/policyCounts';
 
 interface PolicyCardProps {
     policy: Policy;
@@ -98,7 +99,7 @@ export default function PolicyCard({ policy, variant = 'default' }: PolicyCardPr
                 {/* CTA */}
                 <div className="mt-auto pt-4 border-t border-slate-200 flex items-center justify-between">
                     <span className="text-sm text-slate-600">
-                        로드맵 {policy.roadmap?.length || 0}단계 • 서류 {policy.documents?.length || 0}개
+                        로드맵 {getRoadmapCount(policy.roadmap)}단계 • 서류 {getDocumentCount(policy.documents)}개
                     </span>
                     <ExternalLink className="w-4 h-4 text-sky-600" />
                 </div>

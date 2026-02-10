@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
+import JSZip from 'jszip'
+import { PDFParse } from 'pdf-parse'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import type { PolicyFundDB } from '@/lib/supabase/client'
 import type { Policy, PolicyDocument, PolicyRoadmapStep } from '@/lib/mockPolicies'
-export const runtime = 'edge'
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 function cleanKStartupSearchTerm(title?: string): string {
     if (!title) return ''
-    let cleaned = title.trim()
+    let cleaned = sanitizePolicyTitle(title)
     // Remove leading bracketed prefix like "[기관]" or "(기관)" or "【기관】" or "「기관」"
     cleaned = cleaned.replace(/^\s*(?:(?:\[[^\]]+\]|\([^)]+\)|【[^】]+】|「[^」]+」)\s*)+/g, '')
     cleaned = cleaned.replace(/\s*(?:\uC0C8\uB85C\uC6B4\uAC8C\uC2DC\uAE00|\uC0C8\s*\uAE00|\uC2E0\uADDC\s*\uAC8C\uC2DC\uAE00|\uC2E0\uADDC\s*\uAE00|NEW)\s*$/gi, '')
@@ -64,6 +68,15 @@ function decodeHtmlEntities(text: string): string {
         .replace(/&lsquo;|&rsquo;/gi, "'")
 }
 
+function decodeXmlEntities(text: string): string {
+    return text
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+}
+
 function stripHtml(text?: string | null): string {
     if (!text) return ''
     const decodedFirst = decodeHtmlEntities(text)
@@ -74,29 +87,64 @@ function stripHtml(text?: string | null): string {
     return decodedAgain.replace(/\s+/g, ' ').trim()
 }
 
-function parseJsonArray<T>(value: unknown): T[] {
-    if (Array.isArray(value)) return value as T[]
-    if (typeof value === 'string') {
-        try {
-            const parsed = JSON.parse(value)
-            return Array.isArray(parsed) ? (parsed as T[]) : []
-        } catch {
-            return []
-        }
+function parseJsonValue(value: unknown): unknown {
+    if (typeof value !== 'string') return value
+    try {
+        return JSON.parse(value)
+    } catch {
+        return value
+    }
+}
+
+function extractArrayFromObject(value: unknown, keys: string[]): unknown[] {
+    if (!value || typeof value !== 'object') return []
+    const obj = value as Record<string, unknown>
+    for (const key of keys) {
+        const candidate = obj[key]
+        if (Array.isArray(candidate)) return candidate
     }
     return []
 }
 
+function splitTextItems(text: string): string[] {
+    return text
+        .split(/[\n\r\u2022\u00B7\-\*]+/g)
+        .map((line) => line.trim())
+        .filter(Boolean)
+}
+
 function normalizeRoadmap(value: unknown): PolicyRoadmapStep[] {
-    const arr = parseJsonArray<any>(value)
-    return arr
-        .filter((item) => item && typeof item === 'object' && (item.title || item.description))
-        .map((item, index) => ({
-            step: Number.isFinite(item.step) ? Number(item.step) : index + 1,
-            title: item.title ? String(item.title) : `\uB2E8\uACC4 ${index + 1}`,
-            description: item.description ? String(item.description) : '',
-            estimatedDays: item.estimatedDays ? Number(item.estimatedDays) : undefined,
+    const parsed = parseJsonValue(value)
+    const arr = Array.isArray(parsed)
+        ? parsed
+        : extractArrayFromObject(parsed, ['steps', 'roadmap', 'items', 'process', 'procedures'])
+
+    if (!arr.length && typeof parsed === 'string') {
+        const items = splitTextItems(parsed)
+        return items.map((title, index) => ({
+            step: index + 1,
+            title,
+            description: '',
         }))
+    }
+
+    return arr
+        .filter((item) => item && (typeof item === 'object' || typeof item === 'string'))
+        .map((item, index) => {
+            if (typeof item === 'string') {
+                return { step: index + 1, title: item, description: '' }
+            }
+            const obj = item as Record<string, unknown>
+            const title = obj.title ?? obj.name ?? obj.stepTitle ?? obj.label
+            const description = obj.description ?? obj.desc ?? obj.detail
+            const stepValue = Number(obj.step)
+            return {
+                step: Number.isFinite(stepValue) ? stepValue : index + 1,
+                title: title ? String(title) : `\uB2E8\uACC4 ${index + 1}`,
+                description: description ? String(description) : '',
+                estimatedDays: obj.estimatedDays ? Number(obj.estimatedDays) : undefined,
+            }
+        })
 }
 
 function normalizeDocumentCategory(value: unknown): '\uD544\uC218' | '\uC6B0\uB300/\uCD94\uAC00' {
@@ -107,15 +155,68 @@ function normalizeDocumentCategory(value: unknown): '\uD544\uC218' | '\uC6B0\uB3
 }
 
 function normalizeDocuments(value: unknown): PolicyDocument[] {
-    const arr = parseJsonArray<any>(value)
-    return arr
-        .filter((item) => item && typeof item === 'object' && (item.name || item.title))
-        .map((item) => ({
-            name: item.name ? String(item.name) : String(item.title),
-            category: normalizeDocumentCategory(item.category),
-            whereToGet: item.whereToGet ? String(item.whereToGet) : '',
-            link: item.link ? String(item.link) : undefined,
-        }))
+    const parsed = parseJsonValue(value)
+
+    const mapDocuments = (items: unknown[], defaultCategory: '\uD544\uC218' | '\uC6B0\uB300/\uCD94\uAC00') => {
+        return items
+            .map((item) => {
+                if (!item) return null
+                if (typeof item === 'string') {
+                    return {
+                        name: item,
+                        category: defaultCategory,
+                        whereToGet: '',
+                    }
+                }
+                if (typeof item !== 'object') return null
+                const obj = item as Record<string, unknown>
+                const name = obj.name ?? obj.title ?? obj.document ?? obj.doc
+                if (!name) return null
+                return {
+                    name: String(name),
+                    category: normalizeDocumentCategory(obj.category ?? defaultCategory),
+                    whereToGet: obj.whereToGet ? String(obj.whereToGet) : '',
+                    link: obj.link ? String(obj.link) : undefined,
+                }
+            })
+            .filter(Boolean) as PolicyDocument[]
+    }
+
+    if (Array.isArray(parsed)) {
+        return mapDocuments(parsed, '\uD544\uC218')
+    }
+
+    if (typeof parsed === 'string') {
+        const items = splitTextItems(parsed)
+        return mapDocuments(items, '\uD544\uC218')
+    }
+
+    if (parsed && typeof parsed === 'object') {
+        const required = extractArrayFromObject(parsed, [
+            'required',
+            'requiredDocs',
+            'required_documents',
+            'mandatory',
+            'must',
+        ])
+        const optional = extractArrayFromObject(parsed, [
+            'optional',
+            'optionalDocs',
+            'optional_documents',
+            'recommended',
+            'additional',
+        ])
+        const items = extractArrayFromObject(parsed, ['items', 'documents', 'documentList'])
+
+        const merged = [
+            ...mapDocuments(required, '\uD544\uC218'),
+            ...mapDocuments(optional, '\uC6B0\uB300/\uCD94\uAC00'),
+        ]
+        if (merged.length > 0) return merged
+        if (items.length > 0) return mapDocuments(items, '\uD544\uC218')
+    }
+
+    return []
 }
 
 const ROADMAP_SECTION_PATTERN = new RegExp(
@@ -166,14 +267,19 @@ function extractSectionItems(raw: string | null | undefined, pattern: RegExp): s
     if (!raw) return []
     const html = decodeHtmlEntities(raw)
     const headingRegex = new RegExp(
-        `<\\s*(?:h[1-6]|strong|b)[^>]*>[^<]*(?:${pattern.source})[^<]*<\\/\\s*(?:h[1-6]|strong|b)>`,
+        `<\\s*(?:h[1-6]|strong|b|p|th|td)[^>]*>[^<]*(?:${pattern.source})[^<]*<\\/\\s*(?:h[1-6]|strong|b|p|th|td)>`,
         'i'
     )
     const headingMatch = headingRegex.exec(html)
     if (headingMatch) {
         const start = headingMatch.index + headingMatch[0].length
         const tail = html.slice(start)
-        const nextHeadingIndex = tail.search(/<\\s*(?:h[1-6]|strong|b)[^>]*>/i)
+        const listMatch = tail.match(/<\s*(?:ul|ol)[^>]*>([\s\S]*?)<\/\s*(?:ul|ol)>/i)
+        if (listMatch?.[1]) {
+            const listItems = extractListItems(listMatch[1])
+            if (listItems.length > 0) return listItems
+        }
+        const nextHeadingIndex = tail.search(/<\s*(?:h[1-6]|strong|b|th|td)\b[^>]*>|<\s*p\b[^>]*class=["'][^"']*(?:title|tit|sub|section)[^"']*["'][^>]*>/i)
         const sectionHtml = nextHeadingIndex >= 0 ? tail.slice(0, nextHeadingIndex) : tail
         const items = extractListItems(sectionHtml)
         if (items.length > 0) return items
@@ -200,6 +306,33 @@ function extractTitleFromHtml(text?: string | null): string | undefined {
     }
     const stripped = stripHtml(decoded)
     return stripped || undefined
+}
+
+function sanitizePolicyTitle(raw?: string | null): string {
+    if (!raw) return ''
+    let cleaned = stripHtml(raw)
+    if (!cleaned) return ''
+
+    cleaned = cleaned.replace(/\s+/g, ' ').trim()
+    cleaned = cleaned.replace(/\b[가-힣A-Za-z]*\s*D-\d+\b/gi, '').replace(/\s+/g, ' ').trim()
+    cleaned = cleaned.replace(/마감일자?\s*\d{4}[-.]\d{2}[-.]\d{2}/gi, '')
+    cleaned = cleaned.replace(/\b조회\s*[\d,]+/gi, '')
+    cleaned = cleaned.replace(/\b조회\b.*$/i, '')
+    cleaned = cleaned.replace(/\d{4}[-.]\d{2}[-.]\d{2}/g, '')
+    cleaned = cleaned.replace(/\s+/g, ' ').trim()
+
+    const primaryMatch = cleaned.match(/(.+?(?:공고|모집|안내|선정))/)
+    if (primaryMatch?.[1]) return primaryMatch[1].trim()
+
+    const supportMatch = cleaned.match(/(.+?지원(?:사업)?)/)
+    if (supportMatch?.[1]) return supportMatch[1].trim()
+
+    const half = Math.floor(cleaned.length / 2)
+    if (half > 10 && cleaned.slice(0, half) === cleaned.slice(half)) {
+        return cleaned.slice(0, half).trim()
+    }
+
+    return cleaned
 }
 
 function extractDatesFromText(text: string): Date[] {
@@ -322,7 +455,7 @@ function isMeaningfulApplicationPeriod(value?: string | null): boolean {
     return false
 }
 
-const metaCache = new Map<string, { dDay: number | null; applicationPeriod: string | null }>()
+const metaCache = new Map<string, { dDay: number | null; applicationPeriod: string | null; roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] }>()
 
 function shouldFetchDday(url?: string): boolean {
     if (!url) return false
@@ -338,8 +471,16 @@ function shouldFetchDday(url?: string): boolean {
     )
 }
 
-async function fetchMetaFromUrl(url: string): Promise<{ dDay: number | null; applicationPeriod: string | null } | null> {
-    if (metaCache.has(url)) return metaCache.get(url) ?? null
+async function fetchMetaFromUrl(
+    url: string,
+    policyTitle?: string
+): Promise<{ dDay: number | null; applicationPeriod: string | null; roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] } | null> {
+    const cached = metaCache.get(url)
+    if (cached) {
+        const isKStartupCache = url.toLowerCase().includes('k-startup.go.kr')
+        const needsRefresh = isKStartupCache && cached.roadmap.length === 0 && cached.documents.length === 0
+        if (!needsRefresh) return cached
+    }
     try {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 5000)
@@ -348,11 +489,37 @@ async function fetchMetaFromUrl(url: string): Promise<{ dDay: number | null; app
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
             },
+            cache: 'no-store',
         })
         clearTimeout(timeoutId)
         if (!response.ok) return null
         const html = await response.text()
-        const text = stripHtml(html)
+        let effectiveHtml = html
+        let effectiveUrl = url
+
+        const isKStartupSource = url.toLowerCase().includes('k-startup.go.kr')
+        if (isKStartupSource && /go_view\(\d+\)/.test(html)) {
+            const searchTerm = cleanKStartupSearchTerm(extractKStartupSearchTerm(url) || '')
+            const resolvedId = extractKStartupPbancSn(html, searchTerm || '')
+            if (resolvedId) {
+                const detailUrl = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=view&pbancSn=${resolvedId}`
+                try {
+                    const detailResponse = await fetch(detailUrl, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+                        },
+                        cache: 'no-store',
+                    })
+                    if (detailResponse.ok) {
+                        effectiveHtml = await detailResponse.text()
+                        effectiveUrl = detailUrl
+                    }
+                } catch {
+                }
+            }
+        }
+
+        const text = stripHtml(effectiveHtml)
         const applicationPeriod = computeApplicationPeriod(text, text, text)
         const dates = extractDatesFromText(text)
         let dDay: number | null = null
@@ -361,11 +528,456 @@ async function fetchMetaFromUrl(url: string): Promise<{ dDay: number | null; app
             const diff = latest.getTime() - Date.now()
             dDay = Math.ceil(diff / (1000 * 60 * 60 * 24))
         }
-        const result = { dDay, applicationPeriod }
+        const roadmapTitles = extractSectionItems(effectiveHtml, ROADMAP_SECTION_PATTERN)
+        const documentNames = extractSectionItems(effectiveHtml, DOCUMENT_SECTION_PATTERN)
+        let roadmap: PolicyRoadmapStep[] = roadmapTitles.map((title, index) => ({
+            step: index + 1,
+            title,
+            description: '',
+        }))
+        let documents: PolicyDocument[] = documentNames.map((name) => ({
+            name,
+            category: '\uD544\uC218',
+            whereToGet: '',
+        }))
+
+        const isBizinfo = effectiveUrl.toLowerCase().includes('bizinfo.go.kr')
+        const isKStartup = effectiveUrl.toLowerCase().includes('k-startup.go.kr')
+        if (isKStartup && documents.length === 0) {
+            const fallbackDocs = extractKStartupSectionItems(effectiveHtml, '제출서류')
+            documents = fallbackDocs.map((name) => ({
+                name,
+                category: '\uD544\uC218',
+                whereToGet: '',
+            }))
+        }
+        if (isKStartup && roadmap.length === 0) {
+            const fallbackRoadmap = extractKStartupSectionItems(effectiveHtml, '선정절차')
+            roadmap = fallbackRoadmap.map((title, index) => ({
+                step: index + 1,
+                title,
+                description: '',
+            }))
+        }
+        if (isKStartup && (documents.length === 0 || roadmap.length === 0) && policyTitle) {
+            const resolved = await fetchKStartupMetaByTitle(policyTitle)
+            if (resolved) {
+                if (documents.length === 0 && resolved.documents.length > 0) documents = resolved.documents
+                if (roadmap.length === 0 && resolved.roadmap.length > 0) roadmap = resolved.roadmap
+            }
+        }
+        if ((roadmap.length === 0 || documents.length === 0) && isBizinfo) {
+            const attachmentUrls = extractBizinfoAttachmentUrls(effectiveHtml).slice(0, 2)
+            for (const attachmentUrl of attachmentUrls) {
+                const extracted = await extractRoadmapDocumentsFromAttachmentUrl(attachmentUrl)
+                if (roadmap.length === 0 && extracted.roadmap.length > 0) roadmap = extracted.roadmap
+                if (documents.length === 0 && extracted.documents.length > 0) documents = extracted.documents
+                if (roadmap.length > 0 && documents.length > 0) break
+            }
+        }
+        if ((roadmap.length === 0 || documents.length === 0) && isKStartup) {
+            const attachmentUrls = extractKStartupAttachmentUrls(effectiveHtml).slice(0, 2)
+            for (const attachmentUrl of attachmentUrls) {
+                const extracted = await extractRoadmapDocumentsFromAttachmentUrl(attachmentUrl)
+                if (roadmap.length === 0 && extracted.roadmap.length > 0) roadmap = extracted.roadmap
+                if (documents.length === 0 && extracted.documents.length > 0) documents = extracted.documents
+                if (roadmap.length > 0 && documents.length > 0) break
+            }
+        }
+        const result = { dDay, applicationPeriod, roadmap, documents }
         metaCache.set(url, result)
         return result
     } catch {
         return null
+    }
+}
+
+function extractBizinfoAttachmentUrls(html: string): string[] {
+    const decoded = decodeHtmlEntities(html)
+    const matches = [...decoded.matchAll(/fileDown\.do\?atchFileId=([^&"']+)&fileSn=(\d+)/g)]
+    const urls = matches.map((match) => new URL(`cmm/fms/${match[0]}`, 'https://www.bizinfo.go.kr/').toString())
+    return Array.from(new Set(urls))
+}
+
+function extractKStartupAttachmentUrls(html: string): string[] {
+    const decoded = decodeHtmlEntities(html)
+    const urls: string[] = []
+
+    const hrefMatches = [...decoded.matchAll(/href=["'](\/afile\/fileDownload\/[^"']+)["']/gi)]
+    for (const match of hrefMatches) {
+        try {
+            urls.push(new URL(match[1], 'https://www.k-startup.go.kr').toString())
+        } catch {
+            // ignore
+        }
+    }
+
+    const tokenMatches = [...decoded.matchAll(/fnPdfView\(['"]([^'"]+)['"]\)/gi)]
+    for (const match of tokenMatches) {
+        try {
+            urls.push(new URL(`/afile/fileDownload/${match[1]}`, 'https://www.k-startup.go.kr').toString())
+        } catch {
+            // ignore
+        }
+    }
+
+    return Array.from(new Set(urls))
+}
+
+function extractKStartupSectionItems(html: string, sectionTitle: string): string[] {
+    const decoded = decodeHtmlEntities(html)
+    const titleRegex = new RegExp(`<\\s*p[^>]*class=["']title["'][^>]*>\\s*${sectionTitle}\\s*<\\/\\s*p>`, 'i')
+    const match = titleRegex.exec(decoded)
+    if (!match) return []
+    const start = match.index + match[0].length
+    const tail = decoded.slice(start)
+    const nextTitleIndex = tail.search(/<\\s*p[^>]*class=["']title["'][^>]*>/i)
+    const sectionHtml = nextTitleIndex >= 0 ? tail.slice(0, nextTitleIndex) : tail
+    const items = extractListItems(sectionHtml)
+    return items.map((item) => item.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 12)
+}
+
+async function fetchKStartupMetaByTitle(title: string): Promise<{ roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] } | null> {
+    const searchTerm = cleanKStartupSearchTerm(title)
+    if (!searchTerm) return null
+    const listUrl = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=list&schStr=${encodeURIComponent(searchTerm)}`
+    try {
+        const listResponse = await fetch(listUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+            },
+            cache: 'no-store',
+        })
+        if (!listResponse.ok) return null
+        const listHtml = await listResponse.text()
+        const pbancSn = extractKStartupPbancSn(listHtml, title)
+        if (!pbancSn) return null
+        const detailUrl = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=view&pbancSn=${pbancSn}`
+        const detailResponse = await fetch(detailUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+            },
+            cache: 'no-store',
+        })
+        if (!detailResponse.ok) return null
+        const detailHtml = await detailResponse.text()
+        const roadmapTitles = extractSectionItems(detailHtml, ROADMAP_SECTION_PATTERN)
+        const documentNames = extractSectionItems(detailHtml, DOCUMENT_SECTION_PATTERN)
+        let roadmap: PolicyRoadmapStep[] = roadmapTitles.map((item, index) => ({
+            step: index + 1,
+            title: item,
+            description: '',
+        }))
+        let documents: PolicyDocument[] = documentNames.map((name) => ({
+            name,
+            category: '\uD544\uC218',
+            whereToGet: '',
+        }))
+        if (documents.length === 0) {
+            documents = extractKStartupSectionItems(detailHtml, '제출서류').map((name) => ({
+                name,
+                category: '\uD544\uC218',
+                whereToGet: '',
+            }))
+        }
+        if (roadmap.length === 0) {
+            roadmap = extractKStartupSectionItems(detailHtml, '선정절차').map((item, index) => ({
+                step: index + 1,
+                title: item,
+                description: '',
+            }))
+        }
+        return { roadmap, documents }
+    } catch {
+        return null
+    }
+}
+
+function extractHwpxTextLines(xml: string): string[] {
+    const lines: string[] = []
+    const paraRegex = /<hp:p[\s\S]*?<\/hp:p>/gi
+    let match: RegExpExecArray | null
+
+    while ((match = paraRegex.exec(xml)) !== null) {
+        const para = match[0]
+        const texts = [...para.matchAll(/<hp:t>([\s\S]*?)<\/hp:t>/gi)].map((m) =>
+            decodeXmlEntities(m[1]).replace(/<hp:fwSpace\s*\/?>/g, ' ')
+        )
+        const line = texts.join('').replace(/\s+/g, ' ').trim()
+        if (line) lines.push(line)
+    }
+
+    return lines
+}
+
+function extractSectionLinesFromHwpx(lines: string[], headingRegexes: RegExp[], maxLines: number): string[] {
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+        const line = lines[i]
+        if (headingRegexes.some((regex) => regex.test(line))) {
+            return lines.slice(i + 1, i + 1 + maxLines)
+        }
+    }
+    return []
+}
+
+function normalizeStepText(text: string): string {
+    return text.replace(/\s+/g, ' ').trim()
+}
+
+function extractRoadmapFromHwpxLines(lines: string[]): PolicyRoadmapStep[] {
+    const specificHeading = [
+        /\d+[-\d]*\.\s*\uD3C9\uAC00\s*\uC808\uCC28/,
+        /\d+[-\d]*\.\s*\uC2E0\uCCAD\s*\uC808\uCC28/,
+        /\d+[-\d]*\.\s*\uC120\uC815\s*\uC808\uCC28/,
+        /\d+[-\d]*\.\s*\uC9C4\uD589\s*\uC808\uCC28/,
+    ]
+    const generalHeading = [
+        /\uD3C9\uAC00\s*\uC808\uCC28/,
+        /\uC2E0\uCCAD\s*\uC808\uCC28/,
+        /\uC120\uC815\s*\uC808\uCC28/,
+        /\uC9C4\uD589\s*\uC808\uCC28/,
+        /\uD504\uB85C\uC138\uC2A4/,
+        /\uB85C\uB4DC\uB9F5/,
+    ]
+
+    let sectionLines: string[] = []
+
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+        const line = lines[i]
+        if (/^[*\u203B]/.test(line)) continue
+        if (specificHeading.some((regex) => regex.test(line))) {
+            sectionLines = lines.slice(i + 1, i + 1 + 120)
+            break
+        }
+    }
+
+    if (sectionLines.length === 0) {
+        for (let i = lines.length - 1; i >= 0; i -= 1) {
+            const line = lines[i]
+            if (/^[*\u203B]/.test(line)) continue
+            if (generalHeading.some((regex) => regex.test(line))) {
+                sectionLines = lines.slice(i + 1, i + 1 + 120)
+                break
+            }
+        }
+    }
+
+    if (sectionLines.length === 0) return []
+
+    const steps: string[] = []
+    let bucket: string[] = []
+
+    const flush = () => {
+        if (bucket.length === 0) return
+        const merged = normalizeStepText(bucket.join(' '))
+        if (merged) steps.push(merged)
+        bucket = []
+    }
+
+    for (const line of sectionLines) {
+        if (/^\s*\d+\.\s*\S/.test(line)) break
+        if (/(?:\uAE30\uD0C0\s*\uC720\uC758\uC0AC\uD56D|\uBB38\uC758\uCC98|\uD3C9\uAC00\uAE30\uC900|\uAC10\uC810\uAE30\uC900|\uC81C\uCD9C\s*\uC11C\uB958|\uD544\uC694\s*\uC11C\uB958|\uAD6C\uBE44\s*\uC11C\uB958)/.test(line)) break
+        if (/(\u21E8|\u2192|->)/.test(line)) {
+            flush()
+            continue
+        }
+        if (/^\d{2,4}\.\s*\d{1,2}\.\s*\d{1,2}/.test(line)) continue
+        if (line.length <= 1) continue
+        bucket.push(line)
+    }
+    flush()
+
+    const cleaned = steps
+        .map((step) => step.replace(/^[-\u2022\u00B7*\u25A1\u25A0\u3147\s]+/, '').trim())
+        .filter(Boolean)
+
+    if (cleaned.length === 0) return []
+
+    return cleaned.slice(0, 12).map((title, index) => ({
+        step: index + 1,
+        title,
+        description: '',
+    }))
+}
+
+function extractDocumentsFromHwpxLines(lines: string[]): PolicyDocument[] {
+    const sectionLines = extractSectionLinesFromHwpx(
+        lines,
+        [
+            /^\s*\d+[-\d]*\.\s*(?:\uC81C\uCD9C|\uD544\uC694|\uAD6C\uBE44|\uC99D\uBE59|\uC2E0\uCCAD)\s*\uC11C\uB958/,
+            /^\s*(?:\uC81C\uCD9C|\uD544\uC694|\uAD6C\uBE44|\uC99D\uBE59|\uC2E0\uCCAD)\s*\uC11C\uB958$/,
+        ],
+        180
+    )
+    if (sectionLines.length === 0) return []
+
+    const docKeyword = /(\uC11C\uB958|\uD655\uC778\uC11C|\uC2E0\uCCAD\uC11C|\uACC4\uD68D\uC11C|\uC99D\uBE59|\uB3D9\uC758\uC11C|\uD655\uC57D\uC11C|\uBA85\uC138\uC11C|\uC591\uC2DD|\uC11C\uC2DD|\uB4F1\uB85D\uC99D|\uC99D\uBA85\uC11C|\uB4F1\uBCF8|\uC0AC\uBCF8|\uD1B5\uC7A5|\uCE74\uB4DC|\uC6D0\uBCF8|\uBD80\uBCF8)/
+    const stopRegex = /^(?:\uC11C\uB958\uBA85|\uAD6C\uBD84|\uD56D\uBAA9|\uBE44\uACE0)$/i
+
+    const items = sectionLines
+        .map((line) => line.replace(/^[-\u2022\u00B7*\u25A1\u25A0\u3147\s]+/, '').trim())
+        .filter((line) =>
+            line &&
+            line.length > 1 &&
+            !stopRegex.test(line) &&
+            !/^\u203B/.test(line) &&
+            docKeyword.test(line)
+        )
+
+    const unique = Array.from(new Set(items))
+    if (unique.length === 0) return []
+
+    return unique.slice(0, 12).map((name) => ({
+        name,
+        category: '\uD544\uC218',
+        whereToGet: '',
+    }))
+}
+
+function extractSectionLinesFromText(text: string, headingRegexes: RegExp[], maxLines: number): string[] {
+    const lines = text
+        .split(/\r?\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+        const line = lines[i]
+        if (headingRegexes.some((regex) => regex.test(line))) {
+            return lines.slice(i + 1, i + 1 + maxLines)
+        }
+    }
+    return []
+}
+
+function extractRoadmapFromPdfText(text: string): PolicyRoadmapStep[] {
+    const sectionLines = extractSectionLinesFromText(
+        text,
+        [
+            /\d+[-\d]*\.\s*\uD3C9\uAC00\s*\uC808\uCC28/,
+            /\d+[-\d]*\.\s*\uC2E0\uCCAD\s*\uC808\uCC28/,
+            /\d+[-\d]*\.\s*\uC120\uC815\s*\uC808\uCC28/,
+            /\d+[-\d]*\.\s*\uC9C4\uD589\s*\uC808\uCC28/,
+            /\uD3C9\uAC00\s*\uC808\uCC28/,
+            /\uC2E0\uCCAD\s*\uC808\uCC28/,
+            /\uC120\uC815\s*\uC808\uCC28/,
+            /\uC9C4\uD589\s*\uC808\uCC28/,
+            /\uB85C\uB4DC\uB9F5/,
+            /\uD504\uB85C\uC138\uC2A4/,
+        ],
+        120
+    )
+    if (sectionLines.length === 0) return []
+
+    const steps: string[] = []
+    let bucket: string[] = []
+    const flush = () => {
+        if (bucket.length === 0) return
+        const merged = normalizeStepText(bucket.join(' '))
+        if (merged) steps.push(merged)
+        bucket = []
+    }
+
+    for (const line of sectionLines) {
+        if (/^\s*\d+\.\s*\S/.test(line)) break
+        if (/(?:\uAE30\uD0C0\s*\uC720\uC758\uC0AC\uD56D|\uBB38\uC758\uCC98|\uD3C9\uAC00\uAE30\uC900|\uAC10\uC810\uAE30\uC900|\uC81C\uCD9C\s*\uC11C\uB958|\uD544\uC694\s*\uC11C\uB958|\uAD6C\uBE44\s*\uC11C\uB958)/.test(line)) break
+        if (/(?:\u21E8|\u2192|->)/.test(line)) {
+            flush()
+            continue
+        }
+        if (/^\d{2,4}\.\s*\d{1,2}\.\s*\d{1,2}/.test(line)) continue
+        if (line.length <= 1) continue
+        bucket.push(line)
+    }
+    flush()
+
+    const cleaned = steps
+        .map((step) => step.replace(/^[-\u2022\u00B7*\u25A1\u25A0\u3147\s]+/, '').trim())
+        .filter(Boolean)
+
+    if (cleaned.length === 0) return []
+
+    return cleaned.slice(0, 12).map((title, index) => ({
+        step: index + 1,
+        title,
+        description: '',
+    }))
+}
+
+function extractDocumentsFromPdfText(text: string): PolicyDocument[] {
+    const sectionLines = extractSectionLinesFromText(
+        text,
+        [
+            /^\s*\d+[-\d]*\.\s*(?:\uC81C\uCD9C|\uD544\uC694|\uAD6C\uBE44|\uC99D\uBE59|\uC2E0\uCCAD)\s*\uC11C\uB958/,
+            /^\s*(?:\uC81C\uCD9C|\uD544\uC694|\uAD6C\uBE44|\uC99D\uBE59|\uC2E0\uCCAD)\s*\uC11C\uB958$/,
+        ],
+        160
+    )
+    if (sectionLines.length === 0) return []
+
+    const docKeyword = /(\uC11C\uB958|\uD655\uC778\uC11C|\uC2E0\uCCAD\uC11C|\uACC4\uD68D\uC11C|\uC99D\uBE59|\uB3D9\uC758\uC11C|\uD655\uC57D\uC11C|\uBA85\uC138\uC11C|\uC591\uC2DD|\uC11C\uC2DD|\uB4F1\uB85D\uC99D|\uC99D\uBA85\uC11C|\uB4F1\uBCF8|\uC0AC\uBCF8|\uD1B5\uC7A5|\uCE74\uB4DC|\uC6D0\uBCF8|\uBD80\uBCF8)/
+    const stopRegex = /^(?:\uC11C\uB958\uBA85|\uAD6C\uBD84|\uD56D\uBAA9|\uBE44\uACE0)$/i
+
+    const items = sectionLines
+        .map((line) => line.replace(/^[-\u2022\u00B7*\u25A1\u25A0\u3147\s]+/, '').trim())
+        .filter((line) =>
+            line &&
+            line.length > 1 &&
+            !stopRegex.test(line) &&
+            !/^\u203B/.test(line) &&
+            docKeyword.test(line)
+        )
+
+    const unique = Array.from(new Set(items))
+    if (unique.length === 0) return []
+
+    return unique.slice(0, 12).map((name) => ({
+        name,
+        category: '\uD544\uC218',
+        whereToGet: '',
+    }))
+}
+
+async function extractRoadmapDocumentsFromAttachmentUrl(url: string): Promise<{ roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] }> {
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+            },
+        })
+        if (!response.ok) return { roadmap: [], documents: [] }
+        const buffer = Buffer.from(await response.arrayBuffer())
+        const header = buffer.slice(0, 4).toString('utf8')
+
+        if (header.startsWith('PK')) {
+            const zip = await JSZip.loadAsync(buffer)
+            const sectionFile =
+                zip.file(/Contents\/section0\.xml/i)[0] ||
+                zip.file(/Contents\/section\d+\.xml/i)[0]
+            if (!sectionFile) return { roadmap: [], documents: [] }
+            const xml = await sectionFile.async('string')
+            const lines = extractHwpxTextLines(xml)
+            return {
+                roadmap: extractRoadmapFromHwpxLines(lines),
+                documents: extractDocumentsFromHwpxLines(lines),
+            }
+        }
+
+        if (header.startsWith('%PDF')) {
+            const parser = new PDFParse({ data: buffer })
+            try {
+                const parsed = await parser.getText()
+                const text = parsed.text || ''
+                return {
+                    roadmap: extractRoadmapFromPdfText(text),
+                    documents: extractDocumentsFromPdfText(text),
+                }
+            } finally {
+                await parser.destroy()
+            }
+        }
+
+        return { roadmap: [], documents: [] }
+    } catch {
+        return { roadmap: [], documents: [] }
     }
 }
 
@@ -403,23 +1015,23 @@ function normalizeKStartupUrl(
         url = url.replace('/web/contents/bizpbanc-detail.do', '/web/contents/bizpbanc-ongoing.do')
     }
 
+    const goViewMatch = url.match(/go_view(?:_blank)?\((\d+)\)/i)
+    if (goViewMatch?.[1]) {
+        return `${base}?schM=view&pbancSn=${goViewMatch[1]}`
+    }
+
     const pbancMatch = url.match(/pbancSn=(\d+)/)
     const pbancSn = pbancMatch?.[1]
     if (pbancSn) {
         return `${base}?schM=view&pbancSn=${pbancSn}`
     }
-
-    // If original URL already has search keyword, keep it
-    if (url.includes('schStr=')) {
-        return url
-    }
-
-    const searchTerm = cleanKStartupSearchTerm(title)
+    const existingSearch = extractKStartupSearchTerm(url)
+    const searchTerm = cleanKStartupSearchTerm(title) || existingSearch
     if (searchTerm) {
         return `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
     }
 
-    return base
+    return url || base
 }
 
 function normalizeForMatch(text: string): string {
@@ -427,6 +1039,16 @@ function normalizeForMatch(text: string): string {
         .toLowerCase()
         .replace(/\s+/g, '')
         .replace(/[^0-9a-z\uAC00-\uD7A3]/gi, '')
+}
+
+function extractKStartupSearchTerm(url: string): string | undefined {
+    const match = url.match(/[?&]schStr=([^&]+)/)
+    if (!match?.[1]) return undefined
+    try {
+        return decodeURIComponent(match[1].replace(/\+/g, ' ')).trim()
+    } catch {
+        return match[1]
+    }
 }
 
 function extractKStartupPbancSn(html: string, title: string): string | undefined {
@@ -481,18 +1103,22 @@ async function resolveKStartupDetailUrl(
         url = url.replace('/web/contents/bizpbanc-detail.do', '/web/contents/bizpbanc-ongoing.do')
     }
 
+    const goViewMatch = url.match(/go_view(?:_blank)?\((\d+)\)/i)
+    if (goViewMatch?.[1]) {
+        return `${base}?schM=view&pbancSn=${goViewMatch[1]}`
+    }
+
     const pbancMatch = url.match(/pbancSn=(\d+)/)
     const pbancSn = pbancMatch?.[1]
     if (pbancSn) {
         return `${base}?schM=view&pbancSn=${pbancSn}`
     }
 
-    const searchTerm = cleanKStartupSearchTerm(title)
-    const searchUrl = url.includes('schStr=')
-        ? url
-        : searchTerm
-            ? `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
-            : base
+    const existingSearch = extractKStartupSearchTerm(url)
+    const searchTerm = cleanKStartupSearchTerm(title) || existingSearch
+    const searchUrl = searchTerm
+        ? `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
+        : url || base
 
     if (!searchTerm) return searchUrl
 
@@ -524,7 +1150,7 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     const sourceFromUrl = inferSourcePlatformFromUrl(dbPolicy.link || dbPolicy.url)
     const sourceFromSite = normalizeSourceLabel(dbPolicy.source_site)
     const sourcePlatform = sourceFromUrl || sourceFromSite
-    const cleanedTitle = extractTitleFromHtml(dbPolicy.title) || stripHtml(dbPolicy.title)
+    const cleanedTitle = sanitizePolicyTitle(extractTitleFromHtml(dbPolicy.title) || stripHtml(dbPolicy.title))
     const cleanedSummary = stripHtml(dbPolicy.content_summary)
     const cleanedPeriod = stripHtml(dbPolicy.application_period)
     const computedPeriod = computeApplicationPeriod(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
@@ -636,11 +1262,15 @@ export async function GET() {
             }
             const needsDday = mapped.dDay === 999 || mapped.dDay === null
             const needsPeriod = !isMeaningfulApplicationPeriod(mapped.applicationPeriod)
-            if ((needsDday || needsPeriod) && shouldFetchDday(mapped.url)) {
-                const fetched = await fetchMetaFromUrl(mapped.url as string)
+            const needsRoadmap = mapped.roadmap.length === 0
+            const needsDocuments = mapped.documents.length === 0
+            if ((needsDday || needsPeriod || needsRoadmap || needsDocuments) && shouldFetchDday(mapped.url)) {
+                const fetched = await fetchMetaFromUrl(mapped.url as string, mapped.title)
                 if (fetched) {
                     if (needsDday && fetched.dDay !== null) mapped.dDay = fetched.dDay
                     if (needsPeriod && fetched.applicationPeriod) mapped.applicationPeriod = fetched.applicationPeriod
+                    if (needsRoadmap && fetched.roadmap.length > 0) mapped.roadmap = fetched.roadmap.slice(0, 12)
+                    if (needsDocuments && fetched.documents.length > 0) mapped.documents = fetched.documents.slice(0, 12)
                 }
             }
             return mapped

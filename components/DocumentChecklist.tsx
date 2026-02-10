@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PolicyDocument } from '@/lib/mockPolicies';
+import { filterDocumentsForDisplay } from '@/lib/utils/policyCounts';
 import { ExternalLink, FileText, CheckCircle2, Circle } from 'lucide-react';
 
 interface DocumentChecklistProps {
@@ -21,11 +22,31 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
         setCheckedDocs(newChecked);
     };
 
-    const requiredDocs = documents.filter(d => d.category === 'í•„ìˆ˜');
-    const optionalDocs = documents.filter(d => d.category === 'ìš°ëŒ€/ì¶”ê°€');
+    const displayDocuments = filterDocumentsForDisplay(documents);
+    const requiredDocs = displayDocuments.filter((d) => d.category === 'ÇÊ¼ö');
+    const optionalDocs = displayDocuments.filter((d) => d.category === '¿ì´ë/Ãß°¡');
+    const totalDocs = displayDocuments.length;
+    const progressPercent = totalDocs > 0 ? Math.round((checkedDocs.size / totalDocs) * 100) : 0;
+
+    const formatDocumentLines = (value: string) => {
+        if (!value) return [];
+        let normalized = value.replace(/\s+/g, ' ').trim();
+        normalized = normalized
+            .replace(/\s*-\s*/g, '\n')
+            .replace(/[\u2022\u00B7\u318D]/g, '\n')
+            .replace(/\s*¡Ø\s*/g, '\n¡Ø ')
+            .replace(/\s*(?=¨ç|¨è|¨é|¨ê|¨ë|¨ì|¨í|¨î|¨ï|¨ð)/g, '\n');
+        return normalized
+            .split(/\n+/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+    };
 
     const renderDocumentItem = (doc: PolicyDocument) => {
         const isChecked = checkedDocs.has(doc.name);
+        const lines = formatDocumentLines(doc.name);
+        const title = lines[0] || doc.name;
+        const details = lines.slice(1);
 
         return (
             <div
@@ -35,7 +56,7 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                         : 'border-slate-200 bg-white hover:border-blue-300'
                     }`}
             >
-                {/* Checkbox */}
+                {/* Ã¼Å©¹Ú½º */}
                 <button
                     onClick={() => toggleCheck(doc.name)}
                     className="mt-0.5 flex-shrink-0"
@@ -47,13 +68,22 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                     )}
                 </button>
 
-                {/* Content */}
+                {/* ³»¿ë */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4 className={`font-semibold ${isChecked ? 'text-green-900' : 'text-slate-900'}`}>
-                            {doc.name}
-                        </h4>
-                        <span className={`text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap ${doc.category === 'í•„ìˆ˜'
+                        <div className="flex-1 min-w-0">
+                            <h4 className={`font-semibold ${isChecked ? 'text-green-900' : 'text-slate-900'}`}>
+                                {title}
+                            </h4>
+                            {details.length > 0 && (
+                                <ul className="mt-1 list-disc pl-5 space-y-1 text-sm text-slate-600">
+                                    {details.map((line, idx) => (
+                                        <li key={`${doc.name}-${idx}`}>{line}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap ${doc.category === 'ÇÊ¼ö'
                                 ? 'bg-red-100 text-red-700'
                                 : 'bg-blue-100 text-blue-700'
                             }`}>
@@ -74,7 +104,7 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                                 className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                ë°”ë¡œê°€ê¸°
+                                ¹Ù·Î°¡±â
                                 <ExternalLink className="w-3 h-3" />
                             </a>
                         )}
@@ -86,44 +116,25 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
 
     return (
         <div className="space-y-6">
-            {/* Required Documents */}
-            <div>
-                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-600"></span>
-                    í•„ìˆ˜ ì„œë¥˜ ({requiredDocs.length}ê°œ)
-                </h3>
-                <div className="space-y-3">
-                    {requiredDocs.map(renderDocumentItem)}
-                </div>
+            {/* ÇÊ¿ä ¼­·ù ¸ñ·Ï */}
+            <div className="space-y-3">
+                {requiredDocs.map(renderDocumentItem)}
+                {optionalDocs.map(renderDocumentItem)}
             </div>
-
-            {/* Optional Documents */}
-            {optionalDocs.length > 0 && (
-                <div>
-                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                        ìš°ëŒ€/ì¶”ê°€ ì„œë¥˜ ({optionalDocs.length}ê°œ)
-                    </h3>
-                    <div className="space-y-3">
-                        {optionalDocs.map(renderDocumentItem)}
-                    </div>
-                </div>
-            )}
-
-            {/* Progress Summary */}
+            {/* ÁØºñ ÇöÈ² */}
             <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
                 <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-blue-900">
-                        ì¤€ë¹„ ì™„ë£Œ: {checkedDocs.size} / {documents.length}
+                        ÁØºñ ¿Ï·á: {checkedDocs.size} / {totalDocs}
                     </span>
                     <span className="text-sm text-blue-700">
-                        {Math.round((checkedDocs.size / documents.length) * 100)}%
+                        {progressPercent}%
                     </span>
                 </div>
                 <div className="mt-2 w-full h-2 bg-blue-200 rounded-full overflow-hidden">
                     <div
                         className="h-full bg-blue-600 transition-all duration-300"
-                        style={{ width: `${(checkedDocs.size / documents.length) * 100}%` }}
+                        style={{ width: `${progressPercent}%` }}
                     />
                 </div>
             </div>

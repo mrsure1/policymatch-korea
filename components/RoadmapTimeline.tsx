@@ -8,6 +8,20 @@ interface RoadmapTimelineProps {
 }
 
 export default function RoadmapTimeline({ steps }: RoadmapTimelineProps) {
+    const sanitizeText = (value: string) => {
+        if (!value) return '';
+        return value
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/&amp;/gi, '&')
+            .replace(/&lt;/gi, '<')
+            .replace(/&gt;/gi, '>')
+            .replace(/&quot;/gi, '"')
+            .replace(/&#39;|&#x27;/gi, "'")
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
     return (
         <div className="space-y-6">
             {steps.map((step, index) => (
@@ -27,14 +41,14 @@ export default function RoadmapTimeline({ steps }: RoadmapTimelineProps) {
                     <div className="flex-1 pb-6">
                         <div className="bg-white rounded-xl border-2 border-slate-200 p-4">
                             <div className="flex items-start justify-between mb-2">
-                                <h4 className="font-bold text-slate-900">{step.title}</h4>
+                                <h4 className="font-bold text-slate-900">{sanitizeText(step.title)}</h4>
                                 {step.estimatedDays && (
                                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold whitespace-nowrap ml-2">
                                         약 {step.estimatedDays}일
                                     </span>
                                 )}
                             </div>
-                            <p className="text-sm text-slate-600">{step.description}</p>
+                            <p className="text-sm text-slate-600">{sanitizeText(step.description)}</p>
                         </div>
                     </div>
                 </div>
