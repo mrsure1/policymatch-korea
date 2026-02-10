@@ -1,6 +1,7 @@
 'use client';
 
 import { PolicyRoadmapStep } from '@/lib/mockPolicies';
+import { normalizeRoadmapSteps } from '@/lib/utils/policyCounts';
 import { Check, Circle } from 'lucide-react';
 
 interface RoadmapTimelineProps {
@@ -22,9 +23,11 @@ export default function RoadmapTimeline({ steps }: RoadmapTimelineProps) {
             .trim();
     };
 
+    const displaySteps = normalizeRoadmapSteps(steps);
+
     return (
         <div className="space-y-6">
-            {steps.map((step, index) => (
+            {displaySteps.map((step, index) => (
                 <div key={step.step} className="flex gap-4">
                     {/* Timeline Icon */}
                     <div className="flex flex-col items-center">
