@@ -35,7 +35,11 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
     }
 
     // 2. Fallback: First 300 chars of stripped content
-    return stripped.substring(0, 300) + (stripped.length > 300 ? '...' : '');
+    // User requested to remove "다음과 같이"
+    let fallback = stripped.substring(0, 300);
+    fallback = fallback.replace(/다음과\s*같이/g, '').replace(/\s+/g, ' ');
+
+    return fallback + (stripped.length > 300 ? '...' : '');
 }
 
 function parseJsonValue(value: unknown): unknown {
