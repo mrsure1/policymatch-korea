@@ -153,6 +153,36 @@ function normalizeRoadmap(value: unknown): PolicyRoadmapStep[] {
         })
 }
 
+function expandCommaSeparatedRoadmap(steps: PolicyRoadmapStep[]): PolicyRoadmapStep[] {
+    if (steps.length !== 1) return steps
+    const rawTitle = stripHtml(steps[0]?.title || '')
+    if (!rawTitle) return steps
+    if (!/[,\uFF0C]|\s+(?:및|그리고)\s+|[·ㆍ;\/]/.test(rawTitle)) return steps
+
+    let text = rawTitle.split('※')[0]
+    text = text.replace(/\([^)]*참조[^)]*\)/g, ' ')
+    text = text.replace(/\s+/g, ' ').trim()
+    if (!text) return steps
+
+    const parts = text
+        .split(/\s*(?:,|，|·|ㆍ|;|\/|및|그리고)\s*/g)
+        .map((part) =>
+            part
+                .replace(/\(.*?\)/g, ' ')
+                .replace(/\s*등.*$/g, '')
+                .trim()
+        )
+        .filter(Boolean)
+
+    if (parts.length <= 1) return steps
+
+    return parts.slice(0, 12).map((title, index) => ({
+        step: index + 1,
+        title,
+        description: '',
+    }))
+}
+
 function normalizeDocumentCategory(value: unknown): '\uD544\uC218' | '\uC6B0\uB300/\uCD94\uAC00' {
     if (!value) return '\uD544\uC218'
     const raw = String(value)
@@ -1131,6 +1161,7 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
             title,
             description: '',
         }))
+    const expandedRoadmap = expandCommaSeparatedRoadmap(roadmapFallback)
     const documentsFallback: PolicyDocument[] = normalizedDocuments.length > 0
         ? normalizedDocuments
         : extractSectionItems(dbPolicy.raw_content, DOCUMENT_SECTION_PATTERN).map((name): PolicyDocument => ({
@@ -1163,7 +1194,7 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
             businessPeriods: (dbPolicy.criteria?.businessPeriods || (dbPolicy.biz_age ? [dbPolicy.biz_age] : [])) as any,
         },
 
-        roadmap: roadmapFallback.slice(0, 12),
+        roadmap: expandedRoadmap.slice(0, 12),
         documents: documentsFallback.slice(0, 12),
     }
 }
@@ -1235,7 +1266,9 @@ export async function GET() {
                 if (fetched) {
                     if (needsDday && fetched.dDay !== null) mapped.dDay = fetched.dDay
                     if (needsPeriod && fetched.applicationPeriod) mapped.applicationPeriod = fetched.applicationPeriod
-                    if (needsRoadmap && fetched.roadmap.length > 0) mapped.roadmap = fetched.roadmap.slice(0, 12)
+                    if (needsRoadmap && fetched.roadmap.length > 0) {
+                        mapped.roadmap = expandCommaSeparatedRoadmap(fetched.roadmap).slice(0, 12)
+                    }
                     if (needsDocuments && fetched.documents.length > 0) mapped.documents = fetched.documents.slice(0, 12)
                 }
             }
