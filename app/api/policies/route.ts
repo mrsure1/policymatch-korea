@@ -8,6 +8,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+const NO_CACHE_HEADERS: Record<string, string> = {
+    'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate',
+    Pragma: 'no-cache',
+    'CDN-Cache-Control': 'no-store',
+    'Surrogate-Control': 'no-store',
+}
+
 function cleanKStartupSearchTerm(title?: string): string {
     if (!title) return ''
     let cleaned = sanitizePolicyTitle(title)
@@ -1208,7 +1215,7 @@ export async function GET() {
         if (!supabase) {
             return NextResponse.json(
                 { success: false, error: 'Missing Supabase environment variables', data: [] },
-                { status: 500 }
+                { status: 500, headers: NO_CACHE_HEADERS }
             )
         }
         // Supabase에서 모든 정책 데이터 가져오기
@@ -1221,7 +1228,7 @@ export async function GET() {
             console.error('Supabase error:', error)
             return NextResponse.json(
                 { success: false, error: 'Failed to fetch policies from database', data: [] },
-                { status: 500 }
+                { status: 500, headers: NO_CACHE_HEADERS }
             )
         }
 
@@ -1278,18 +1285,21 @@ export async function GET() {
 
         console.log(`✅ Fetched ${policies.length} policies, IDs:`, policies.map(p => p.id))
 
-        return NextResponse.json({
-            success: true,
-            data: policies,
-            count: policies.length,
-            error: null
-        })
+        return NextResponse.json(
+            {
+                success: true,
+                data: policies,
+                count: policies.length,
+                error: null,
+            },
+            { headers: NO_CACHE_HEADERS }
+        )
 
     } catch (error) {
         console.error('API error:', error)
         return NextResponse.json(
             { success: false, error: 'Internal server error', data: [] },
-            { status: 500 }
+            { status: 500, headers: NO_CACHE_HEADERS }
         )
     }
 }
