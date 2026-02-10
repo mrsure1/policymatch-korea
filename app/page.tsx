@@ -229,14 +229,14 @@ export default function HomePage() {
         <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 text-slate-100">
           <div>
             <h2 className="text-2xl font-bold text-slate-100">
-              매칭된 정책
+              전체 매칭 결과
               <span className="ml-2 text-2xl font-extrabold text-sky-200 font-sans tabular-nums tracking-tight leading-none drop-shadow-sm">
                 {loading ? '...' : matchedPolicies.length}
               </span>
               개
             </h2>
             <p className="text-slate-300 mt-1">
-              회원님의 프로필과 일치하는 정부 지원 정책입니다
+              프로필 기준으로 조회된 전체 공고(맞춤 매칭 + 공통 공고 포함)입니다
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -269,8 +269,8 @@ export default function HomePage() {
               <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-br from-sky-900/60 via-slate-900/50 to-indigo-900/60 p-5 shadow-lg ring-1 ring-sky-300/20">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-100">맞춤 매칭 정책</h3>
-                    <p className="text-xs text-slate-300 mt-1">프로필 조건과 직접 일치한 공고</p>
+                    <h3 className="text-lg font-bold text-slate-100">프로필 핵심 일치 공고</h3>
+                    <p className="text-xs text-slate-300 mt-1">지역·업종·연령 등 조건이 실제로 맞는 공고만 모았습니다</p>
                   </div>
                   <span className="text-xs font-semibold text-slate-900 bg-sky-300 px-3 py-1 rounded-full">
                     {matchedList.length}건
