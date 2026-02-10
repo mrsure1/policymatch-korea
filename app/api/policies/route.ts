@@ -9,6 +9,7 @@ function cleanKStartupSearchTerm(title?: string): string {
     let cleaned = title.trim()
     // Remove leading bracketed prefix like "[기관]" or "(기관)" or "【기관】" or "「기관」"
     cleaned = cleaned.replace(/^\s*(?:(?:\[[^\]]+\]|\([^)]+\)|【[^】]+】|「[^」]+」)\s*)+/g, '')
+    cleaned = cleaned.replace(/\s*(?:\uC0C8\uB85C\uC6B4\uAC8C\uC2DC\uAE00|\uC0C8\s*\uAE00|\uC2E0\uADDC\s*\uAC8C\uC2DC\uAE00|\uC2E0\uADDC\s*\uAE00|NEW)\s*$/gi, '')
     cleaned = cleaned.replace(/\s+/g, ' ').trim()
     return cleaned
 }
