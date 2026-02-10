@@ -105,6 +105,11 @@ export default function PolicyDetailPage() {
     }
 
     const source = getSourceMeta()
+    const disclaimerTitle = '\uC8FC\uC758\uC0AC\uD56D'
+    const disclaimerLine1 = '\uBCF8 \uC11C\uBE44\uC2A4\uB294 \uACF5\uACF5\uB370\uC774\uD130\uB97C \uAE30\uBC18\uC73C\uB85C \uC815\uBCF4\uB97C \uC81C\uACF5\uD558\uBA70, \uC2E4\uC81C \uACF5\uACE0 \uB0B4\uC6A9\uACFC \uCC28\uC774\uAC00 \uC788\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'
+    const disclaimerLine2 = '\uBC95\uC801 \uD6A8\uB825\uC774 \uC788\uB294 \uC815\uD655\uD55C \uB0B4\uC6A9\uC740 \uBC18\uB4DC\uC2DC'
+    const disclaimerLinkLabel = '\uACF5\uACE0\uBB38 \uBCF4\uB7EC\uAC00\uAE30'
+    const disclaimerLine3 = '\uBC84\uD2BC\uC744 \uD1B5\uD574 \uC6D0\uBB38\uC5D0\uC11C \uD655\uC778\uD558\uC2DC\uAE30 \uBC14\uB78D\uB2C8\uB2E4.'
 
     const splitSummaryItems = (summary: string) => {
         const raw = (summary || '').replace(/\r/g, '\n').trim()
@@ -397,15 +402,22 @@ export default function PolicyDetailPage() {
                     </div>
                 )}
 
-                {/* 주의사항 */}
+                                                {/* ???? */}
                 <div className="flex items-start gap-3 bg-amber-50/90 border border-amber-200 p-4 rounded-2xl text-sm text-amber-900">
                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                     <div>
-                        <span className="font-bold block mb-1">????</span>
-                        ? ???? ?????? ???? ??? ????, ?? ?? ??? ??? ?? ? ????.
-                        ?? ??? ?? ??? ??? ??? <strong>[??? ????]</strong> ??? ?? ???? ????? ????.
+                        <span className="font-bold block mb-1">{disclaimerTitle}</span>
+                        {disclaimerLine1}
+                        {' '}
+                        {disclaimerLine2}
+                        {' '}
+                        <strong>[{disclaimerLinkLabel}]</strong>
+                        {' '}
+                        {disclaimerLine3}
                     </div>
                 </div>
+
+
 
 
             </div>

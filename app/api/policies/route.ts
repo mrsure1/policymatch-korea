@@ -1250,7 +1250,7 @@ export async function GET() {
         const filtered = (data as PolicyFundDB[]).filter((p) => !isTestPolicy(p) && !isInvalidKStartup(p))
 
         // DB 데이터를 UI 타입으로 변환 + D-Day 보정
-        const policies: Policy[] = await mapWithLimit(filtered, 5, async (p) => {
+        const policies: Policy[] = await mapWithLimit(filtered, 12, async (p) => {
             const mapped = mapDBToUI(p)
             if (mapped.url) {
                 const resolved = await resolveKStartupDetailUrl(

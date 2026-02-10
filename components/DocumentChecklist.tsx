@@ -1,4 +1,4 @@
-'use client';
+Ôªø'use client';
 
 import { useState } from 'react';
 import { PolicyDocument } from '@/lib/mockPolicies';
@@ -23,8 +23,8 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
     };
 
     const displayDocuments = filterDocumentsForDisplay(documents);
-    const requiredDocs = displayDocuments.filter((d) => d.category === '« ºˆ');
-    const optionalDocs = displayDocuments.filter((d) => d.category === 'øÏ¥Î/√ﬂ∞°');
+    const requiredDocs = displayDocuments.filter((d) => d.category === 'ÌïÑÏàò');
+    const optionalDocs = displayDocuments.filter((d) => d.category === 'Ïö∞ÎåÄ/Ï∂îÍ∞Ä');
     const totalDocs = displayDocuments.length;
     const progressPercent = totalDocs > 0 ? Math.round((checkedDocs.size / totalDocs) * 100) : 0;
 
@@ -33,9 +33,9 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
         let normalized = value.replace(/\s+/g, ' ').trim();
         normalized = normalized
             .replace(/\s*-\s*/g, '\n')
-            .replace(/[\u2022\u00B7\u318D]/g, '\n')
-            .replace(/\s*°ÿ\s*/g, '\n°ÿ ')
-            .replace(/\s*(?=®Á|®Ë|®È|®Í|®Î|®Ï|®Ì|®Ó|®Ô|®)/g, '\n');
+            .replace(/[‚Ä¢¬∑„Üç]/g, '\n')
+            .replace(/\s*‚Äª\s*/g, '\n‚Äª ')
+            .replace(/\s*(?=‚ë†|‚ë°|‚ë¢|‚ë£|‚ë§|‚ë•|‚ë¶|‚ëß|‚ë®|‚ë©)/g, '\n');
         return normalized
             .split(/\n+/)
             .map((line) => line.trim())
@@ -56,7 +56,7 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                         : 'border-slate-200 bg-white hover:border-blue-300'
                     }`}
             >
-                {/* √º≈©π⁄Ω∫ */}
+                {/* Ï≤¥ÌÅ¨Î∞ïÏä§ */}
                 <button
                     onClick={() => toggleCheck(doc.name)}
                     className="mt-0.5 flex-shrink-0"
@@ -68,7 +68,7 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                     )}
                 </button>
 
-                {/* ≥ªøÎ */}
+                {/* ÎÇ¥Ïö© */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                         <div className="flex-1 min-w-0">
@@ -83,7 +83,7 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                                 </ul>
                             )}
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap ${doc.category === '« ºˆ'
+                        <span className={`text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap ${doc.category === 'ÌïÑÏàò'
                                 ? 'bg-red-100 text-red-700'
                                 : 'bg-blue-100 text-blue-700'
                             }`}>
@@ -104,7 +104,7 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                                 className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                πŸ∑Œ∞°±‚
+                                Î∞îÎ°úÍ∞ÄÍ∏∞
                                 <ExternalLink className="w-3 h-3" />
                             </a>
                         )}
@@ -116,16 +116,16 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
 
     return (
         <div className="space-y-6">
-            {/* « ø‰ º≠∑˘ ∏Ò∑œ */}
+            {/* ÌïÑÏöî ÏÑúÎ•ò Î™©Î°ù */}
             <div className="space-y-3">
                 {requiredDocs.map(renderDocumentItem)}
                 {optionalDocs.map(renderDocumentItem)}
             </div>
-            {/* ¡ÿ∫Ò «ˆ»≤ */}
+            {/* Ï§ÄÎπÑ ÌòÑÌô© */}
             <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
                 <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-blue-900">
-                        ¡ÿ∫Ò øœ∑·: {checkedDocs.size} / {totalDocs}
+                        Ï§ÄÎπÑ ÏôÑÎ£å: {checkedDocs.size} / {totalDocs}
                     </span>
                     <span className="text-sm text-blue-700">
                         {progressPercent}%
