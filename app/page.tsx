@@ -269,7 +269,10 @@ export default function HomePage() {
               <div className="rounded-2xl border border-sky-300/60 bg-gradient-to-br from-sky-900/70 via-slate-900/55 to-indigo-900/70 p-5 shadow-lg ring-1 ring-sky-300/25">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-sky-100 drop-shadow-sm">프로필 핵심 일치 공고</h3>
+                    <h3 className="text-lg font-bold text-sky-100 drop-shadow-sm flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-sky-300" />
+                      프로필 핵심 일치 공고
+                    </h3>
                     <p className="text-xs text-slate-300 mt-1">지역·업종·연령 등 조건이 실제로 맞는 공고만 모았습니다</p>
                   </div>
                   <span className="text-xs font-semibold text-slate-900 bg-sky-300 px-3 py-1 rounded-full">
@@ -288,7 +291,10 @@ export default function HomePage() {
               <div className="rounded-2xl border border-slate-500/40 bg-gradient-to-br from-slate-900/40 via-slate-900/20 to-slate-800/40 p-5 ring-1 ring-white/5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-100">공통 공고</h3>
+                    <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-slate-300" />
+                      공통 공고
+                    </h3>
                     <p className="text-xs text-slate-400 mt-1">전체/전국/무관 등 공통 조건 공고</p>
                   </div>
                   <span className="text-xs font-semibold text-slate-900 bg-white/80 px-3 py-1 rounded-full border border-slate-200/80">
