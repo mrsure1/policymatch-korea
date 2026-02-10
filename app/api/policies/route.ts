@@ -305,6 +305,103 @@ function normalizeKStartupUrl(
     return base
 }
 
+function normalizeForMatch(text: string): string {
+    return stripHtml(text)
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[^0-9a-z\uAC00-\uD7A3]/gi, '')
+}
+
+function extractKStartupPbancSn(html: string, title: string): string | undefined {
+    const normalizedTitle = normalizeForMatch(cleanKStartupSearchTerm(title))
+    const matches: Array<{ id: string; index: number }> = []
+    const goViewRegex = /go_view\((\d+)\)/g
+    let match: RegExpExecArray | null
+
+    while ((match = goViewRegex.exec(html)) !== null) {
+        matches.push({ id: match[1], index: match.index })
+        if (matches.length > 50) break
+    }
+
+    if (matches.length === 0) {
+        const pbancMatch = html.match(/pbancSn=(\d+)/)
+        return pbancMatch?.[1]
+    }
+
+    if (!normalizedTitle) return matches[0].id
+
+    for (const item of matches) {
+        const window = html.slice(item.index, item.index + 800)
+        const titleAttr = window.match(/title=["']([^"']+)["']/i)
+        const textMatch = window.match(/>([^<]{6,})</)
+        const candidateRaw = titleAttr?.[1] || textMatch?.[1]
+        if (!candidateRaw) continue
+        const candidate = normalizeForMatch(candidateRaw)
+        if (!candidate) continue
+        if (candidate.includes(normalizedTitle) || normalizedTitle.includes(candidate)) {
+            return item.id
+        }
+    }
+
+    return matches[0].id
+}
+
+async function resolveKStartupDetailUrl(
+    rawUrl: string | null | undefined,
+    title: string,
+    sourceSite: string | null | undefined
+): Promise<string | undefined> {
+    if (!rawUrl) return rawUrl || undefined
+    let url = rawUrl.trim()
+    const isKStartup = url.includes('k-startup.go.kr') || sourceSite === 'K-STARTUP'
+    if (!isKStartup) return url
+
+    const base = 'https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do'
+    if (url.startsWith('http://')) {
+        url = url.replace('http://', 'https://')
+    }
+    if (url.includes('/web/contents/bizpbanc-detail.do')) {
+        url = url.replace('/web/contents/bizpbanc-detail.do', '/web/contents/bizpbanc-ongoing.do')
+    }
+
+    const pbancMatch = url.match(/pbancSn=(\d+)/)
+    const pbancSn = pbancMatch?.[1]
+    if (pbancSn) {
+        return `${base}?schM=view&pbancSn=${pbancSn}`
+    }
+
+    const searchTerm = cleanKStartupSearchTerm(title)
+    const searchUrl = url.includes('schStr=')
+        ? url
+        : searchTerm
+            ? `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
+            : base
+
+    if (!searchTerm) return searchUrl
+
+    try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        const response = await fetch(searchUrl, {
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+            },
+        })
+        clearTimeout(timeoutId)
+        if (!response.ok) return searchUrl
+        const html = await response.text()
+        const resolvedId = extractKStartupPbancSn(html, title)
+        if (resolvedId) {
+            return `${base}?schM=view&pbancSn=${resolvedId}`
+        }
+    } catch {
+        return searchUrl
+    }
+
+    return searchUrl
+}
+
 // DB 데이터 → UI 타입 변환
 function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     const sourceFromUrl = inferSourcePlatformFromUrl(dbPolicy.link || dbPolicy.url)
@@ -396,6 +493,14 @@ export async function GET() {
         // DB 데이터를 UI 타입으로 변환 + D-Day 보정
         const policies: Policy[] = await mapWithLimit(filtered, 5, async (p) => {
             const mapped = mapDBToUI(p)
+            if (mapped.url) {
+                const resolved = await resolveKStartupDetailUrl(
+                    p.link || p.url || mapped.url,
+                    mapped.title,
+                    p.source_site
+                )
+                if (resolved) mapped.url = resolved
+            }
             const needsDday = mapped.dDay === 999 || mapped.dDay === null
             const needsPeriod = !isMeaningfulApplicationPeriod(mapped.applicationPeriod)
             if ((needsDday || needsPeriod) && shouldFetchDday(mapped.url)) {
