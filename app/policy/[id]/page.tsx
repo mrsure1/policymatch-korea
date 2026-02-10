@@ -5,7 +5,7 @@ import { useUserProfileStore } from '@/lib/store';
 import { usePolicies } from '@/lib/hooks/usePolicies';
 import RoadmapTimeline from '@/components/RoadmapTimeline';
 import DocumentChecklist from '@/components/DocumentChecklist';
-import { getDocumentCount, getRoadmapCount } from '@/lib/utils/policyCounts';
+import { getDocumentCount, getRoadmapCount, getRoadmapSteps, getRequiredDocuments } from '@/lib/utils/policyCounts';
 import { ArrowLeft, Calendar, Building2, TrendingUp, MapPin, FileCheck, Loader2, ExternalLink, AlertTriangle, Info, Map } from 'lucide-react';
 export const runtime = 'edge'
 
@@ -371,38 +371,38 @@ export default function PolicyDetailPage() {
                 ) : null}
 
                 {/* 5. Action Roadmap */}
-                {policy.roadmap && getRoadmapCount(policy.roadmap) > 0 && (
+                {getRoadmapCount(policy.roadmap, policy.detailContent) > 0 && (
                     <div className="glass-card rounded-2xl p-6 text-slate-900">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                                 <Map className="w-5 h-5 text-blue-600" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900">신청 로드맵 ({getRoadmapCount(policy.roadmap)}단계)</h2>
+                                <h2 className="text-lg font-bold text-slate-900">신청 로드맵 ({getRoadmapCount(policy.roadmap, policy.detailContent)}단계)</h2>
                                 <p className="text-xs text-slate-500">단계별 신청 절차를 안내합니다</p>
                             </div>
                         </div>
-                        <RoadmapTimeline steps={policy.roadmap} />
+                        <RoadmapTimeline steps={getRoadmapSteps(policy.roadmap, policy.detailContent)} />
                     </div>
                 )}
 
                 {/* 6. Required Documents */}
-                {policy.documents && getDocumentCount(policy.documents) > 0 && (
+                {getDocumentCount(policy.documents, policy.detailContent) > 0 && (
                     <div className="glass-card rounded-2xl p-6 text-slate-900">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
                                 <FileCheck className="w-5 h-5 text-green-600" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900">필요 서류 ({getDocumentCount(policy.documents)}개)</h2>
+                                <h2 className="text-lg font-bold text-slate-900">필요 서류 ({getDocumentCount(policy.documents, policy.detailContent)}개)</h2>
                                 <p className="text-xs text-slate-500">신청 시 필요한 서류를 확인하세요</p>
                             </div>
                         </div>
-                        <DocumentChecklist documents={policy.documents} />
+                        <DocumentChecklist documents={getRequiredDocuments(policy.documents, policy.detailContent)} />
                     </div>
                 )}
 
-                                                {/* ???? */}
+                {/* ???? */}
                 <div className="flex items-start gap-3 bg-amber-50/90 border border-amber-200 p-4 rounded-2xl text-sm text-amber-900">
                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                     <div>
