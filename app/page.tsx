@@ -269,7 +269,7 @@ export default function HomePage() {
               <div className="rounded-2xl border border-sky-300/60 bg-gradient-to-br from-sky-900/70 via-slate-900/55 to-indigo-900/70 p-5 shadow-lg ring-1 ring-sky-300/25">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-sky-100 drop-shadow-sm flex items-center gap-2">
+                    <h3 className="text-xl sm:text-2xl font-bold text-sky-100 drop-shadow-sm flex items-center gap-2">
                       <Sparkles className="w-5 h-5 text-sky-300" />
                       프로필 핵심 일치 공고
                     </h3>
