@@ -3,12 +3,14 @@
 import { useUserProfileStore } from '@/lib/store';
 import { usePolicies } from '@/lib/hooks/usePolicies';
 import PolicyCard from '@/components/PolicyCard';
-import { ArrowLeft, Loader2, Sparkles, AlertCircle, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles, AlertCircle, FileText, Home } from 'lucide-react';
 import Link from 'next/link';
 import { Policy } from '@/lib/mockPolicies';
+import { useRouter } from 'next/navigation';
 
 export default function ArchivePage() {
     const { profile } = useUserProfileStore();
+    const router = useRouter();
     // skipFiltering: true 옵션으로 모든 데이터 로드
     const { policies, loading, error } = usePolicies(profile, { skipFiltering: true });
 
@@ -21,12 +23,22 @@ export default function ArchivePage() {
             <header className="sticky top-0 z-20 glass-dark">
                 <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <Link
-                            href="/"
-                            className="p-2 rounded-full border border-slate-700/50 bg-slate-900/40 hover:border-sky-400 transition-colors text-slate-200"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                        </Link>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => router.back()}
+                                className="flex items-center gap-2 px-3 py-2 rounded-full border border-slate-700/60 bg-slate-900/60 hover:border-sky-400 hover:bg-slate-800/70 transition-colors text-slate-100 text-sm font-semibold"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                뒤로가기
+                            </button>
+                            <Link
+                                href="/"
+                                className="flex items-center gap-2 px-3 py-2 rounded-full border border-sky-400/60 bg-sky-400/10 hover:bg-sky-400/20 transition-colors text-sky-100 text-sm font-semibold"
+                            >
+                                <Home className="w-4 h-4" />
+                                메인으로
+                            </Link>
+                        </div>
                         <div>
                             <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
                                 <FileText className="w-5 h-5 text-sky-300" />
