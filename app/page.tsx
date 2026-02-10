@@ -266,10 +266,10 @@ export default function HomePage() {
         ) : matchedPolicies.length > 0 ? (
           <div className="space-y-10">
             {matchedList.length > 0 && (
-              <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-br from-sky-900/60 via-slate-900/50 to-indigo-900/60 p-5 shadow-lg ring-1 ring-sky-300/20">
+              <div className="rounded-2xl border border-sky-300/60 bg-gradient-to-br from-sky-900/70 via-slate-900/55 to-indigo-900/70 p-5 shadow-lg ring-1 ring-sky-300/25">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-100">프로필 핵심 일치 공고</h3>
+                    <h3 className="text-lg font-bold text-sky-100 drop-shadow-sm">프로필 핵심 일치 공고</h3>
                     <p className="text-xs text-slate-300 mt-1">지역·업종·연령 등 조건이 실제로 맞는 공고만 모았습니다</p>
                   </div>
                   <span className="text-xs font-semibold text-slate-900 bg-sky-300 px-3 py-1 rounded-full">
