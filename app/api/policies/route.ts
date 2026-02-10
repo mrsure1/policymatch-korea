@@ -93,6 +93,89 @@ function stripHtml(text?: string | null): string {
     return decodedAgain.replace(/\s+/g, ' ').trim()
 }
 
+const SUMMARY_NOISE_PATTERN = /\b(\uC0C8\uB85C\uC6B4\uAC8C\uC2DC\uAE00|\uC0C8\s*\uAE00|\uC2E0\uADDC\s*\uAC8C\uC2DC\uAE00|NEW)\b/gi
+const SUMMARY_GENERIC_PATTERN = /(\uC0C1\uC138\s*\uB0B4\uC6A9\s*\uCC38\uC870|\uB0B4\uC6A9\s*\uCC38\uC870|\uD648\uD398\uC774\uC9C0\s*\uCC38\uC870|\uACF5\uACE0\uBB38\s*\uCC38\uC870|\uBBF8\uC815|\uD574\uB2F9\s*\uC5C6\uC74C)/i
+const SUMMARY_SKIP_PATTERN = /(\uACF5\uACE0\uBB38\s*\uCC38\uC870|\uD648\uD398\uC774\uC9C0\s*\uCC38\uC870|\uC790\uC138\uD55C\s*\uB0B4\uC6A9|\uC790\uC138\uD55C\s*\uC0AC\uD56D|\uC0C1\uC138\s*\uB0B4\uC6A9|\uBCF8\uBB38\s*\uCC38\uC870)/i
+const SUMMARY_KEYWORDS = [
+    '\uBAA8\uC9D1',
+    '\uC9C0\uC6D0',
+    '\uB300\uC0C1',
+    '\uD61C\uD0DD',
+    '\uC790\uAE08',
+    '\uAE30\uAC04',
+    '\uC2E0\uCCAD',
+    '\uC120\uC815',
+    '\uD3C9\uAC00',
+    '\uD504\uB85C\uADF8\uB7A8',
+    '\uD328\uD0A4\uC9C0',
+    '\uAD50\uC721',
+    '\uBA58\uD1A0\uB9C1',
+    '\uC0AC\uC5C5\uD654',
+]
+
+function cleanSummaryText(text: string): string {
+    if (!text) return ''
+    let cleaned = stripHtml(text)
+    cleaned = cleaned.replace(SUMMARY_NOISE_PATTERN, ' ')
+    cleaned = cleaned.replace(/\s+/g, ' ').trim()
+    return cleaned
+}
+
+function isGenericSummary(text: string): boolean {
+    if (!text) return true
+    if (SUMMARY_GENERIC_PATTERN.test(text) && text.length <= 50) return true
+    return false
+}
+
+function splitSummarySentences(text: string): string[] {
+    if (!text) return []
+    const normalized = text
+        .replace(/([.!?])\s+/g, '$1\n')
+        .replace(/(\uB2E4\.|\uB2C8\uB2E4\.|\uD569\uB2C8\uB2E4\.|\uB429\uB2C8\uB2E4\.|\uC788\uC2B5\uB2C8\uB2E4\.)\s+/g, '$1\n')
+    return normalized
+        .split(/\n+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+}
+
+function extractSummaryFromContent(rawContent?: string | null, title?: string | null): string {
+    if (!rawContent) return ''
+    let text = stripHtml(rawContent)
+    if (!text) return ''
+    if (title) {
+        text = text.replace(title, ' ')
+    }
+    text = text.replace(/\uACF5\uACE0\s*\uC81C?\s*\d{4}[-.]\d+\s*\uD638?/g, ' ')
+    text = text.replace(SUMMARY_NOISE_PATTERN, ' ')
+    text = text.replace(/\s+/g, ' ').trim()
+    if (!text) return ''
+
+    const sentences = splitSummarySentences(text)
+    const selected: string[] = []
+
+    for (const sentence of sentences) {
+        if (SUMMARY_SKIP_PATTERN.test(sentence)) continue
+        if (sentence.length < 10) continue
+        if (sentence.length > 220) continue
+        if (SUMMARY_KEYWORDS.some((keyword) => sentence.includes(keyword))) {
+            selected.push(sentence)
+        }
+        if (selected.length >= 3) break
+    }
+
+    if (selected.length === 0) {
+        for (const sentence of sentences) {
+            if (SUMMARY_SKIP_PATTERN.test(sentence)) continue
+            if (sentence.length < 10) continue
+            selected.push(sentence)
+            if (selected.length >= 2) break
+        }
+    }
+
+    return cleanSummaryText(selected.join('\n'))
+}
+
+
 function parseJsonValue(value: unknown): unknown {
     if (typeof value !== 'string') return value
     try {
@@ -1163,7 +1246,8 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     const sourceFromSite = normalizeSourceLabel(dbPolicy.source_site)
     const sourcePlatform = sourceFromUrl || sourceFromSite
     const cleanedTitle = sanitizePolicyTitle(extractTitleFromHtml(dbPolicy.title) || stripHtml(dbPolicy.title))
-    const cleanedSummary = stripHtml(dbPolicy.content_summary)
+    const cleanedSummary = cleanSummaryText(dbPolicy.content_summary || '')
+    const summaryFallback = isGenericSummary(cleanedSummary) ? extractSummaryFromContent(dbPolicy.raw_content, cleanedTitle) : cleanedSummary
     const cleanedPeriod = stripHtml(dbPolicy.application_period)
     const computedPeriod = computeApplicationPeriod(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
     const computedDDayRaw = computeDDay(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
@@ -1188,7 +1272,7 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     return {
         id: String(dbPolicy.id), // 숫자 ID를 문자열로 변환
         title: cleanedTitle || '제목 없음',
-        summary: cleanedSummary || '',
+        summary: summaryFallback || '',
         supportAmount: dbPolicy.amount || '미정',
         dDay: computedDDay ?? dbPolicy.d_day ?? 999,
         applicationPeriod: isMeaningfulApplicationPeriod(cleanedPeriod)
