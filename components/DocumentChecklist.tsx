@@ -35,7 +35,9 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
             .replace(/\s*-\s*/g, '\n')
             .replace(/[•·ㆍ]/g, '\n')
             .replace(/\s*※\s*/g, '\n※ ')
+            .replace(/\s*,\s*/g, '\n')
             .replace(/\s*(?=①|②|③|④|⑤|⑥|⑦|⑧|⑨|⑩)/g, '\n');
+        normalized = normalized.replace(/\s*(필수|우대\/추가)\s*$/g, '');
         return normalized
             .split(/\n+/)
             .map((line) => line.trim())
