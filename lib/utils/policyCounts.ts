@@ -13,6 +13,20 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
         .replace(/\s+/g, ' ')
         .trim();
 
+    // 0. Prioritize introductory text ending in "공고합니다" or "모집합니다"
+    // Example: "... 재창업기업 모집계획을 다음과 같이 공고합니다."
+    // This is often the best summary for government announcements.
+    const introRegex = /^([\s\S]*?)(?:다음과\s*같이|아래와\s*같이)?\s*(?:공고합니다|모집합니다|안내합니다)[\.]*/i;
+    const introMatch = stripped.match(introRegex);
+    if (introMatch && introMatch[1]) {
+        const potentialSummary = introMatch[1].trim();
+        // If it's too long (> 500 chars), it might be fetching too much garbage before the match. 
+        // But usually the intro is the first paragraph.
+        if (potentialSummary.length > 20 && potentialSummary.length < 600) {
+            return potentialSummary.replace(/\s+/g, ' ');
+        }
+    }
+
     // 1. Try to find specific sections (사업개요, 사업목적, 지원분야 etc.)
     const overviewKeywords = ['사업개요', '사업목적', '지원분야', '지원대상', '개요'];
     for (const keyword of overviewKeywords) {
