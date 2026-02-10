@@ -99,13 +99,20 @@ function normalizeRoadmap(value: unknown): Array<{ step: number; title: string; 
         }))
 }
 
-function normalizeDocuments(value: unknown): Array<{ name: string; category: string; whereToGet: string; link?: string }> {
+function normalizeDocumentCategory(value: unknown): '\uD544\uC218' | '\uC6B0\uB300/\uCD94\uAC00' {
+    if (!value) return '\uD544\uC218'
+    const raw = String(value)
+    if (/\uC6B0\uB300|\uCD94\uAC00|\uC120\uD0DD|\uC635\uC158|\uCC38\uACE0/i.test(raw)) return '\uC6B0\uB300/\uCD94\uAC00'
+    return '\uD544\uC218'
+}
+
+function normalizeDocuments(value: unknown): Array<{ name: string; category: '\uD544\uC218' | '\uC6B0\uB300/\uCD94\uAC00'; whereToGet: string; link?: string }> {
     const arr = parseJsonArray<any>(value)
     return arr
         .filter((item) => item && typeof item === 'object' && (item.name || item.title))
         .map((item) => ({
             name: item.name ? String(item.name) : String(item.title),
-            category: item.category ? String(item.category) : '\uD544\uC218',
+            category: normalizeDocumentCategory(item.category),
             whereToGet: item.whereToGet ? String(item.whereToGet) : '',
             link: item.link ? String(item.link) : undefined,
         }))
