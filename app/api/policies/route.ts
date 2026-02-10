@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import type { PolicyFundDB } from '@/lib/supabase/client'
-import type { Policy } from '@/lib/mockPolicies'
+import type { Policy, PolicyDocument, PolicyRoadmapStep } from '@/lib/mockPolicies'
 export const runtime = 'edge'
 
 function cleanKStartupSearchTerm(title?: string): string {
@@ -87,7 +87,7 @@ function parseJsonArray<T>(value: unknown): T[] {
     return []
 }
 
-function normalizeRoadmap(value: unknown): Array<{ step: number; title: string; description: string; estimatedDays?: number }> {
+function normalizeRoadmap(value: unknown): PolicyRoadmapStep[] {
     const arr = parseJsonArray<any>(value)
     return arr
         .filter((item) => item && typeof item === 'object' && (item.title || item.description))
@@ -106,7 +106,7 @@ function normalizeDocumentCategory(value: unknown): '\uD544\uC218' | '\uC6B0\uB3
     return '\uD544\uC218'
 }
 
-function normalizeDocuments(value: unknown): Array<{ name: string; category: '\uD544\uC218' | '\uC6B0\uB300/\uCD94\uAC00'; whereToGet: string; link?: string }> {
+function normalizeDocuments(value: unknown): PolicyDocument[] {
     const arr = parseJsonArray<any>(value)
     return arr
         .filter((item) => item && typeof item === 'object' && (item.name || item.title))
@@ -530,18 +530,18 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     const computedPeriod = computeApplicationPeriod(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
     const computedDDayRaw = computeDDay(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
     const computedDDay = Number.isFinite(computedDDayRaw) ? computedDDayRaw : null
-    const normalizedRoadmap = normalizeRoadmap(dbPolicy.roadmap)
-    const normalizedDocuments = normalizeDocuments(dbPolicy.documents)
-    const roadmapFallback = normalizedRoadmap.length > 0
+    const normalizedRoadmap: PolicyRoadmapStep[] = normalizeRoadmap(dbPolicy.roadmap)
+    const normalizedDocuments: PolicyDocument[] = normalizeDocuments(dbPolicy.documents)
+    const roadmapFallback: PolicyRoadmapStep[] = normalizedRoadmap.length > 0
         ? normalizedRoadmap
-        : extractSectionItems(dbPolicy.raw_content, ROADMAP_SECTION_PATTERN).map((title, index) => ({
+        : extractSectionItems(dbPolicy.raw_content, ROADMAP_SECTION_PATTERN).map((title, index): PolicyRoadmapStep => ({
             step: index + 1,
             title,
             description: '',
         }))
-    const documentsFallback = normalizedDocuments.length > 0
+    const documentsFallback: PolicyDocument[] = normalizedDocuments.length > 0
         ? normalizedDocuments
-        : extractSectionItems(dbPolicy.raw_content, DOCUMENT_SECTION_PATTERN).map((name) => ({
+        : extractSectionItems(dbPolicy.raw_content, DOCUMENT_SECTION_PATTERN).map((name): PolicyDocument => ({
             name,
             category: '\uD544\uC218',
             whereToGet: '',
