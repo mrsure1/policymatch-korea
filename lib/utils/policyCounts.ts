@@ -1,5 +1,43 @@
 ﻿import type { PolicyRoadmapStep, PolicyDocument } from '@/lib/mockPolicies';
 
+export function getPolicySummary(summary: string | undefined, detailContent?: string): string {
+    if (summary && summary.trim().length > 10 && summary.trim() !== '요약정보가 없습니다.') return summary;
+    if (!detailContent) return '';
+
+    // Simple HTML strip
+    const stripped = detailContent
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // 1. Try to find specific sections (사업개요, 사업목적, 지원분야 etc.)
+    const overviewKeywords = ['사업개요', '사업목적', '지원분야', '지원대상', '개요'];
+    for (const keyword of overviewKeywords) {
+        // Match keyword, allow optional colon/space, capture until next sectionlike header
+        // A section header often looks like "2. 지원대상" or "□ 지원내용" or just a break
+        // For simple plain text, we look for a reasonable chunk.
+
+        // Let's try to find the keyword and take the next 300 chars or until a likely new section
+        const idx = stripped.indexOf(keyword);
+        if (idx !== -1) {
+            // Take substring from match
+            const start = idx + keyword.length;
+            const chunk = stripped.substring(start, start + 400).trim();
+            // Cleanup leading dots/colons
+            const cleanChunk = chunk.replace(/^[:\.\s]+/, '');
+            if (cleanChunk.length > 20) {
+                return cleanChunk + (cleanChunk.length >= 400 ? '...' : '');
+            }
+        }
+    }
+
+    // 2. Fallback: First 300 chars of stripped content
+    return stripped.substring(0, 300) + (stripped.length > 300 ? '...' : '');
+}
+
 function parseJsonValue(value: unknown): unknown {
     if (typeof value !== 'string') return value;
     try {

@@ -5,7 +5,7 @@ import { useUserProfileStore } from '@/lib/store';
 import { usePolicies } from '@/lib/hooks/usePolicies';
 import RoadmapTimeline from '@/components/RoadmapTimeline';
 import DocumentChecklist from '@/components/DocumentChecklist';
-import { getDocumentCount, getRoadmapCount, getRoadmapSteps, getRequiredDocuments } from '@/lib/utils/policyCounts';
+import { getDocumentCount, getRoadmapCount, getRoadmapSteps, getRequiredDocuments, getPolicySummary } from '@/lib/utils/policyCounts';
 import { ArrowLeft, Calendar, Building2, TrendingUp, MapPin, FileCheck, Loader2, ExternalLink, AlertTriangle, Info, Map } from 'lucide-react';
 export const runtime = 'edge'
 
@@ -138,7 +138,7 @@ export default function PolicyDetailPage() {
         return sentenceSplit.length > 1 ? sentenceSplit : [raw]
     }
 
-    const summaryItems = splitSummaryItems(policy.summary)
+    const summaryItems = splitSummaryItems(getPolicySummary(policy.summary, policy.detailContent))
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
