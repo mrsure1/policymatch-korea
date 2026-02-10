@@ -74,6 +74,115 @@ function stripHtml(text?: string | null): string {
     return decodedAgain.replace(/\s+/g, ' ').trim()
 }
 
+function parseJsonArray<T>(value: unknown): T[] {
+    if (Array.isArray(value)) return value as T[]
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value)
+            return Array.isArray(parsed) ? (parsed as T[]) : []
+        } catch {
+            return []
+        }
+    }
+    return []
+}
+
+function normalizeRoadmap(value: unknown): Array<{ step: number; title: string; description: string; estimatedDays?: number }> {
+    const arr = parseJsonArray<any>(value)
+    return arr
+        .filter((item) => item && typeof item === 'object' && (item.title || item.description))
+        .map((item, index) => ({
+            step: Number.isFinite(item.step) ? Number(item.step) : index + 1,
+            title: item.title ? String(item.title) : `\uB2E8\uACC4 ${index + 1}`,
+            description: item.description ? String(item.description) : '',
+            estimatedDays: item.estimatedDays ? Number(item.estimatedDays) : undefined,
+        }))
+}
+
+function normalizeDocuments(value: unknown): Array<{ name: string; category: string; whereToGet: string; link?: string }> {
+    const arr = parseJsonArray<any>(value)
+    return arr
+        .filter((item) => item && typeof item === 'object' && (item.name || item.title))
+        .map((item) => ({
+            name: item.name ? String(item.name) : String(item.title),
+            category: item.category ? String(item.category) : '\uD544\uC218',
+            whereToGet: item.whereToGet ? String(item.whereToGet) : '',
+            link: item.link ? String(item.link) : undefined,
+        }))
+}
+
+const ROADMAP_SECTION_PATTERN = new RegExp(
+    [
+        '\\uB85C\\uB4DC\\uB9F5',
+        '\\uC2E0\\uCCAD\\s*\\uC808\\uCC28',
+        '\\uC120\\uC815\\s*\\uC808\\uCC28',
+        '\\uD3C9\\uAC00\\s*\\uC808\\uCC28',
+        '\\uC9C4\\uD589\\s*\\uC808\\uCC28',
+        '\\uC9C4\\uD589\\s*\\uD504\\uB85C\\uC138\\uC2A4',
+        '\\uD504\\uB85C\\uC138\\uC2A4',
+    ].join('|'),
+    'i'
+)
+
+const DOCUMENT_SECTION_PATTERN = new RegExp(
+    [
+        '\\uD544\\uC694\\s*\\uC11C\\uB958',
+        '\\uC81C\\uCD9C\\s*\\uC11C\\uB958',
+        '\\uAD6C\\uBE44\\s*\\uC11C\\uB958',
+        '\\uC99D\\uBE59\\s*\\uC11C\\uB958',
+        '\\uC2E0\\uCCAD\\s*\\uC11C\\uB958',
+    ].join('|'),
+    'i'
+)
+
+function extractListItems(sectionHtml: string): string[] {
+    const items: string[] = []
+    const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi
+    let match: RegExpExecArray | null
+    while ((match = liRegex.exec(sectionHtml)) !== null) {
+        const item = stripHtml(match[1])
+        if (item) items.push(item)
+        if (items.length >= 12) break
+    }
+    if (items.length > 0) return items
+
+    const text = stripHtml(sectionHtml)
+    if (!text) return []
+    return text
+        .split(/[\n\r\u2022\u00B7\-\*]+/g)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 12)
+}
+
+function extractSectionItems(raw: string | null | undefined, pattern: RegExp): string[] {
+    if (!raw) return []
+    const html = decodeHtmlEntities(raw)
+    const headingRegex = new RegExp(
+        `<\\s*(?:h[1-6]|strong|b)[^>]*>[^<]*(?:${pattern.source})[^<]*<\\/\\s*(?:h[1-6]|strong|b)>`,
+        'i'
+    )
+    const headingMatch = headingRegex.exec(html)
+    if (headingMatch) {
+        const start = headingMatch.index + headingMatch[0].length
+        const tail = html.slice(start)
+        const nextHeadingIndex = tail.search(/<\\s*(?:h[1-6]|strong|b)[^>]*>/i)
+        const sectionHtml = nextHeadingIndex >= 0 ? tail.slice(0, nextHeadingIndex) : tail
+        const items = extractListItems(sectionHtml)
+        if (items.length > 0) return items
+    }
+
+    const text = stripHtml(html)
+    if (!pattern.test(text)) return []
+    const idx = text.search(pattern)
+    if (idx < 0) return []
+    const tail = text.slice(idx)
+    const lines = tail.split(/\n+/).map((line) => line.trim()).filter(Boolean)
+    if (lines.length <= 1) return []
+    const items = lines.slice(1).filter((line) => !pattern.test(line))
+    return items.slice(0, 12)
+}
+
 function extractTitleFromHtml(text?: string | null): string | undefined {
     if (!text) return undefined
     const decoded = decodeHtmlEntities(text)
@@ -414,6 +523,22 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     const computedPeriod = computeApplicationPeriod(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
     const computedDDayRaw = computeDDay(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
     const computedDDay = Number.isFinite(computedDDayRaw) ? computedDDayRaw : null
+    const normalizedRoadmap = normalizeRoadmap(dbPolicy.roadmap)
+    const normalizedDocuments = normalizeDocuments(dbPolicy.documents)
+    const roadmapFallback = normalizedRoadmap.length > 0
+        ? normalizedRoadmap
+        : extractSectionItems(dbPolicy.raw_content, ROADMAP_SECTION_PATTERN).map((title, index) => ({
+            step: index + 1,
+            title,
+            description: '',
+        }))
+    const documentsFallback = normalizedDocuments.length > 0
+        ? normalizedDocuments
+        : extractSectionItems(dbPolicy.raw_content, DOCUMENT_SECTION_PATTERN).map((name) => ({
+            name,
+            category: '\uD544\uC218',
+            whereToGet: '',
+        }))
     return {
         id: String(dbPolicy.id), // 숫자 ID를 문자열로 변환
         title: cleanedTitle || '제목 없음',
@@ -439,8 +564,8 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
             businessPeriods: (dbPolicy.criteria?.businessPeriods || (dbPolicy.biz_age ? [dbPolicy.biz_age] : [])) as any,
         },
 
-        roadmap: dbPolicy.roadmap || [],
-        documents: dbPolicy.documents || [],
+        roadmap: roadmapFallback.slice(0, 12),
+        documents: documentsFallback.slice(0, 12),
     }
 }
 
