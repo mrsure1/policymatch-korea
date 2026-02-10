@@ -1,10 +1,12 @@
 ﻿import type { PolicyRoadmapStep, PolicyDocument } from '@/lib/mockPolicies';
 
 export function getPolicySummary(summary: string | undefined, detailContent?: string): string {
-    if (summary && summary.trim().length > 10 && summary.trim() !== '요약정보가 없습니다.') return summary;
+    // 1. If valid summary exists, use it
+    if (summary && summary.trim().length > 10 && !summary.includes('요약정보가 없습니다')) return summary;
+
     if (!detailContent) return '';
 
-    // Simple HTML strip
+    // 2. Strip HTML tags and clean whitespace
     const stripped = detailContent
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
@@ -13,45 +15,46 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
         .replace(/\s+/g, ' ')
         .trim();
 
-    // 0. Prioritize introductory text ending in "공고합니다" or "모집합니다"
-    // Example: "... 재창업기업 모집계획을 다음과 같이 공고합니다."
-    // This is often the best summary for government announcements.
-    const introRegex = /^([\s\S]*?)(?:다음과\s*같이|아래와\s*같이)?\s*(?:공고합니다|모집합니다|안내합니다)[\.]*/i;
+    if (!stripped) return '';
+
+    // 3. Try to extract introductory announcement (High priority)
+    // Matches text ending in "공고합니다", "모집합니다" etc. allowing for "다음과 같이" before it.
+    // Capture the *entire* sentence structure leading up to it.
+    const introRegex = /([^.!?\n]*(?:모집|공고|시행|안내)[^.!?\n]*(?:합니다|하오니|바랍니다)[\.]?)/i;
     const introMatch = stripped.match(introRegex);
+
     if (introMatch && introMatch[1]) {
-        const potentialSummary = introMatch[1].trim();
-        // If it's too long (> 500 chars), it might be fetching too much garbage before the match. 
-        // But usually the intro is the first paragraph.
-        if (potentialSummary.length > 20 && potentialSummary.length < 600) {
-            return potentialSummary.replace(/\s+/g, ' ');
+        let introText = introMatch[1].trim();
+        // Remove "다음과 같이" if present
+        introText = introText.replace(/다음과\s*같이/g, '').replace(/\s+/g, ' ').trim();
+
+        // If the captured text is substantial, return it
+        if (introText.length > 20) {
+            return introText;
         }
     }
 
-    // 1. Try to find specific sections (사업개요, 사업목적, 지원분야 etc.)
-    const overviewKeywords = ['사업개요', '사업목적', '지원분야', '지원대상', '개요'];
+    // 4. Try keywords (Content sections)
+    const overviewKeywords = ['사업개요', '사업목적', '지원분야', '지원대상', '개요', '신청자격'];
     for (const keyword of overviewKeywords) {
-        // Match keyword, allow optional colon/space, capture until next sectionlike header
-        // A section header often looks like "2. 지원대상" or "□ 지원내용" or just a break
-        // For simple plain text, we look for a reasonable chunk.
-
-        // Let's try to find the keyword and take the next 300 chars or until a likely new section
         const idx = stripped.indexOf(keyword);
         if (idx !== -1) {
-            // Take substring from match
             const start = idx + keyword.length;
-            const chunk = stripped.substring(start, start + 400).trim();
-            // Cleanup leading dots/colons
-            const cleanChunk = chunk.replace(/^[:\.\s]+/, '');
-            if (cleanChunk.length > 20) {
-                return cleanChunk + (cleanChunk.length >= 400 ? '...' : '');
+            // Take up to 300 chars
+            let chunk = stripped.substring(start, start + 300).trim();
+            // Remove leading punctuation (colon, dot) often found like "사업개요 : ..."
+            chunk = chunk.replace(/^[:\.\-]\s*/, '');
+
+            if (chunk.length > 20) {
+                return chunk + (stripped.length > start + 300 ? '...' : '');
             }
         }
     }
 
-    // 2. Fallback: First 300 chars of stripped content
-    // User requested to remove "다음과 같이"
+    // 5. Last Resort Fallback: Just take the first clean chunk of text
+    // Avoid "다음과 같이" if it appears in the fallback
     let fallback = stripped.substring(0, 300);
-    fallback = fallback.replace(/다음과\s*같이/g, '').replace(/\s+/g, ' ');
+    fallback = fallback.replace(/다음과\s*같이/g, '').replace(/\s+/g, ' ').trim();
 
     return fallback + (stripped.length > 300 ? '...' : '');
 }
