@@ -505,7 +505,7 @@ function formatDateKst(date: Date): string {
 
 function extractDateRangeFromText(text: string): { start: Date; end: Date } | null {
     const normalized = text.replace(/\s+/g, ' ')
-    const labelHints = /(\uC2E0\uCCAD|\uC811\uC218|\uBAA8\uC9D1|\uACF5\uACE0|\uC0AC\uC5C5)\s*\uAE30\uAC04[^0-9]{0,10}(.{0,120})/g
+    const labelHints = /(\uC2E0\uCCAD|\uC811\uC218|\uBAA8\uC9D1|\uACF5\uACE0)\s*\uAE30\uAC04[^0-9]{0,10}(.{0,120})/g
     const rangeRegexes: RegExp[] = [
         /(\d{4}[^~]{0,40}\d{1,2}[^~]{0,40}\d{1,2}[^~]{0,20})\s*(?:~|\uFF5E|\u2212|-|\u2014|\uBD80\uD130)\s*(\d{4}[^~]{0,40}\d{1,2}[^~]{0,40}\d{1,2}[^~]{0,20})/g,
         /(\d{4}[^~]{0,40}\d{1,2}[^~]{0,40}\d{1,2}[^~]{0,20})\s*(?:~|\uFF5E|\u2212|-|\u2014|\uBD80\uD130)\s*(\d{1,2}[^~]{0,10}\d{1,2}[^~]{0,10})/g,
