@@ -555,10 +555,26 @@ function computeApplicationPeriod(applicationPeriod?: string | null, contentSumm
     return null
 }
 
+function normalizeApplicationPeriodText(value?: string | null): string | null {
+    if (!value) return null
+    const text = stripHtml(value)
+    if (!text) return null
+    const range = extractDateRangeFromText(text)
+    if (range) return `${formatDateKst(range.start)} ~ ${formatDateKst(range.end)}`
+    if (/(\uC0C1\uC2DC|\uC218\uC2DC|\uC608\uC0B0\s*\uC18C\uC9C4|\uC608\uC0B0\uC18C\uC9C4)/.test(text)) return '\uC0C1\uC2DC'
+    return null
+}
+
 function computeDDay(applicationPeriod?: string | null, contentSummary?: string | null, rawContent?: string | null): number | null {
     const combined = [applicationPeriod, contentSummary, rawContent].filter(Boolean).join(' ')
     const text = stripHtml(combined)
     if (!text) return null
+
+    const range = extractDateRangeFromText(text)
+    if (range) {
+        const diff = range.end.getTime() - Date.now()
+        return Math.ceil(diff / (1000 * 60 * 60 * 24))
+    }
 
     const dates = extractDatesFromText(text)
     if (dates.length === 0) {
@@ -572,15 +588,7 @@ function computeDDay(applicationPeriod?: string | null, contentSummary?: string 
 }
 
 function isMeaningfulApplicationPeriod(value?: string | null): boolean {
-    if (!value) return false
-    const text = stripHtml(value)
-    if (!text) return false
-    if (/(\uC0C1\uC2DC|\uC218\uC2DC|\uC608\uC0B0\s*\uC18C\uC9C4|\uC608\uC0B0\uC18C\uC9C4|\uD648\uD398\uC774\uC9C0|\uCC38\uC870|\uBB38\uC758|\uBBF8\uC815)/.test(text) && !/\d{4}/.test(text)) {
-        return false
-    }
-    if (/\d{4}\D+\d{1,2}\D+\d{1,2}/.test(text)) return true
-    if (/(\d{1,2}\D+\d{1,2})/.test(text) && /(~|\uBD80\uD130|\uAE4C\uC9C0)/.test(text)) return true
-    return false
+    return normalizeApplicationPeriodText(value) !== null
 }
 
 const metaCache = new Map<string, { dDay: number | null; applicationPeriod: string | null; roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] }>()
@@ -1291,9 +1299,7 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
         summary: summaryFallback || '',
         supportAmount: dbPolicy.amount || '미정',
         dDay: computedDDay ?? dbPolicy.d_day ?? 999,
-        applicationPeriod: isMeaningfulApplicationPeriod(cleanedPeriod)
-            ? cleanedPeriod
-            : computedPeriod || cleanedPeriod || '\uC0C1\uC2DC',
+        applicationPeriod: normalizeApplicationPeriodText(computedPeriod) || normalizeApplicationPeriodText(cleanedPeriod) || '\uC0C1\uC2DC',
         agency: dbPolicy.agency || extractAgencyFallback(cleanedTitle, cleanedSummary) || sourcePlatform || '정부기관',
         sourcePlatform,
         url: normalizeKStartupUrl(dbPolicy.link || dbPolicy.url || undefined, dbPolicy.title, dbPolicy.source_site),
