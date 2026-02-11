@@ -28,7 +28,7 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
     // 3. Try to extract introductory announcement (High priority)
     // Matches text ending in "공고합니다", "모집합니다" etc. allowing for "다음과 같이" before it.
     // Capture the *entire* sentence structure leading up to it.
-    const introRegex = /([^.!?\n]*(?:모집|공고|시행|안내)[^.!?\n]*(?:합니다|하오니|바랍니다)[\.]?)/i;
+    const introRegex = /([^.!?]*(?:모집|공고|시행|안내)[^.!?]*(?:합니다|하오니|바랍니다)[\.]?)/i;
     const introMatch = stripped.match(introRegex);
 
     if (introMatch && introMatch[1]) {
