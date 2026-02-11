@@ -31,7 +31,22 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
 
     if (!stripped || stripped.length < 5) return '';
 
-    // 3. Try to extract introductory announcement (High priority)
+    // 3. Highest priority: "모집계획 ... 공고합니다" announcement sentence
+    // Example target:
+    // "성실한 실패 경험 ... 「2026년도 ... 모집계획」을 다음과 같이 공고합니다."
+    const planAnnouncementRegex = /([^.!?]*(?:모집계획|모집\s*공고)[^.!?]*(?:다음과\s*같이\s*)?공고합니다\.?)/i;
+    const planAnnouncementMatch = stripped.match(planAnnouncementRegex);
+
+    if (planAnnouncementMatch && planAnnouncementMatch[1]) {
+        const planText = planAnnouncementMatch[1]
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (planText.length > 20) {
+            return planText;
+        }
+    }
+
+    // 4. Try to extract introductory announcement (fallback)
     // Matches text ending in "공고합니다", "모집합니다" etc. allowing for "다음과 같이" before it.
     // Capture the *entire* sentence structure leading up to it. 
     // Relaxed regex to catch "2026년 ... 공고합니다" even if separated by random chars
@@ -40,8 +55,7 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
 
     if (introMatch && introMatch[1]) {
         let introText = introMatch[1].trim();
-        // Remove "다음과 같이" if present
-        introText = introText.replace(/다음과\s*같이/g, '').replace(/\s+/g, ' ').trim();
+        introText = introText.replace(/\s+/g, ' ').trim();
 
         // If the captured text is substantial, return it
         if (introText.length > 20) {
@@ -49,7 +63,7 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
         }
     }
 
-    // 4. Try keywords (Content sections)
+    // 5. Try keywords (Content sections)
     const overviewKeywords = ['사업개요', '사업목적', '지원분야', '지원대상', '개요', '신청자격'];
     for (const keyword of overviewKeywords) {
         const idx = stripped.indexOf(keyword);
@@ -66,7 +80,7 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
         }
     }
 
-    // 5. Last Resort Fallback: Just take the first clean chunk of text
+    // 6. Last Resort Fallback: Just take the first clean chunk of text
     // Avoid "다음과 같이" if it appears in the fallback
     let fallback = stripped.substring(0, 400); // Increased buffer
     fallback = fallback.replace(/다음과\s*같이/g, '').replace(/\s+/g, ' ').trim();
