@@ -6,8 +6,13 @@ function stripHtml(html: string): string {
     return html
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<[^>]+>/g, '\n') // Replace tags with newlines to preserve structure
+        // Replace block elements with newlines
+        .replace(/<\/?(div|p|h[1-6]|li|tr|br|ul|ol|table|section|article|aside|header|footer)[^>]*>/gi, '\n')
+        // Remove all other tags (inline like b, span, etc)
+        .replace(/<[^>]+>/g, '')
         .replace(/&nbsp;/gi, ' ')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
         .replace(/[ \t]+/g, ' ') // Collapse spaces but keep newlines
         .replace(/\n\s*\n/g, '\n') // Collapse multiple newlines
         .trim();
@@ -20,14 +25,15 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
     if (!detailContent) return '';
 
     // 2. Strip HTML tags and clean whitespace
-    // Use the helper but optimize for single line summary vs structured text
+    // Replace newlines with spaces for summary extraction to treat as one block
     const stripped = stripHtml(detailContent).replace(/\n/g, ' ');
 
-    if (!stripped) return '';
+    if (!stripped || stripped.length < 5) return '';
 
     // 3. Try to extract introductory announcement (High priority)
     // Matches text ending in "공고합니다", "모집합니다" etc. allowing for "다음과 같이" before it.
-    // Capture the *entire* sentence structure leading up to it.
+    // Capture the *entire* sentence structure leading up to it. 
+    // Relaxed regex to catch "2026년 ... 공고합니다" even if separated by random chars
     const introRegex = /([^.!?]*(?:모집|공고|시행|안내)[^.!?]*(?:합니다|하오니|바랍니다)[\.]?)/i;
     const introMatch = stripped.match(introRegex);
 
@@ -61,10 +67,11 @@ export function getPolicySummary(summary: string | undefined, detailContent?: st
 
     // 5. Last Resort Fallback: Just take the first clean chunk of text
     // Avoid "다음과 같이" if it appears in the fallback
-    let fallback = stripped.substring(0, 300);
+    let fallback = stripped.substring(0, 400); // Increased buffer
     fallback = fallback.replace(/다음과\s*같이/g, '').replace(/\s+/g, ' ').trim();
 
-    return fallback + (stripped.length > 300 ? '...' : '');
+    // Ensure we return something if content exists
+    return fallback + (stripped.length > 400 ? '...' : '');
 }
 
 function parseJsonValue(value: unknown): unknown {
