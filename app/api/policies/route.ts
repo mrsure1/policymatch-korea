@@ -1258,12 +1258,20 @@ function extractKStartupPbancSn(html: string, title: string): string | undefined
     const normalizedCandidates = candidates.map((c) => normalizeForMatch(c)).filter(Boolean)
     const tokenCandidates = candidates.map((c) => tokenizeForMatch(c)).filter((tokens) => tokens.length > 0)
     const matches: Array<{ id: string; index: number }> = []
-    const goViewRegex = /go_view\((\d+)\)/g
+    const goViewRegex = /go_view(?:_blank)?\((\d+)\)/g
     let match: RegExpExecArray | null
 
     while ((match = goViewRegex.exec(html)) !== null) {
         matches.push({ id: match[1], index: match.index })
         if (matches.length > 50) break
+    }
+
+    if (matches.length === 0) {
+        const pbancRegex = /pbancSn=(\d+)/g
+        while ((match = pbancRegex.exec(html)) !== null) {
+            matches.push({ id: match[1], index: match.index })
+            if (matches.length > 50) break
+        }
     }
 
     if (matches.length === 0) {
