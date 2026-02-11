@@ -514,21 +514,25 @@ function extractDateRangeFromText(text: string): { start: Date; end: Date } | nu
     const findRange = (source: string): { start: Date; end: Date } | null => {
         for (const regex of rangeRegexes) {
             regex.lastIndex = 0
-            const match = regex.exec(source)
-            if (!match) continue
-            const startText = match[1]
-            let endText = match[2]
-            const startDates = extractDatesFromText(startText)
-            if (startDates.length === 0) continue
-            const start = startDates[0]
-            if (!/20\d{2}/.test(endText)) {
-                const startYear = formatDateKst(start).slice(0, 4)
-                endText = `${startYear} ${endText}`
+            let match: RegExpExecArray | null
+            while ((match = regex.exec(source)) !== null) {
+                const startText = match[1]
+                let endText = match[2]
+                const startDates = extractDatesFromText(startText)
+                if (startDates.length === 0) continue
+                const start = startDates[0]
+                if (!/20\d{2}/.test(endText)) {
+                    const startYear = formatDateKst(start).slice(0, 4)
+                    endText = `${startYear} ${endText}`
+                }
+                const endDates = extractDatesFromText(endText)
+                if (endDates.length === 0) continue
+                const end = endDates[0]
+                const spanDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                // Skip multi-year project ranges often labeled as "사업기간" rather than application periods.
+                if (spanDays < 0 || spanDays > 370) continue
+                return { start, end }
             }
-            const endDates = extractDatesFromText(endText)
-            if (endDates.length === 0) continue
-            const end = endDates[0]
-            return { start, end }
         }
         return null
     }
