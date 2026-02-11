@@ -1274,6 +1274,8 @@ function extractKStartupPbancSn(html: string, title: string): string | undefined
     // Avoid linking to an unrelated first result when title matching is not reliable.
     if (normalizedCandidates.length === 0) return undefined
 
+    let bestByTokenOverlap: { id: string; score: number } | undefined
+
     for (const item of matches) {
         const window = html.slice(item.index, item.index + 800)
         const titleAttr = window.match(/title=["']([^"']+)["']/i)
@@ -1286,13 +1288,22 @@ function extractKStartupPbancSn(html: string, title: string): string | undefined
             return item.id
         }
         const candidateTokens = new Set(tokenizeForMatch(candidateRaw))
-        const hasTokenMatch = tokenCandidates.some((tokens) => {
+        const overlapScore = tokenCandidates.reduce((best, tokens) => {
             const overlap = tokens.filter((token) => candidateTokens.has(token)).length
-            return overlap >= Math.min(2, tokens.length)
-        })
+            return Math.max(best, overlap)
+        }, 0)
+        const hasTokenMatch = tokenCandidates.some((tokens) => overlapScore >= Math.min(2, tokens.length))
         if (hasTokenMatch) {
             return item.id
         }
+        if (!bestByTokenOverlap || overlapScore > bestByTokenOverlap.score) {
+            bestByTokenOverlap = { id: item.id, score: overlapScore }
+        }
+    }
+
+    if (matches.length === 1) return matches[0].id
+    if (bestByTokenOverlap && bestByTokenOverlap.score >= 1) {
+        return bestByTokenOverlap.id
     }
 
     return undefined
