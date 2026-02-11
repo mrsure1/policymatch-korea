@@ -139,6 +139,59 @@ export default function PolicyDetailPage() {
     }
 
     const summaryItems = splitSummaryItems(getPolicySummary(policy.summary, policy.detailContent))
+    const normalizeKStartupSearchTerm = (value: string) =>
+        value
+            .replace(/^\s*(?:\[[^\]]+\]|\([^)]+\)|【[^】]+】)\s*/g, '')
+            .replace(/[^\uAC00-\uD7A3A-Za-z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+
+    const getOfficialUrl = (url?: string, title?: string) => {
+        if (!url) return undefined
+        const lower = url.toLowerCase()
+        if (!lower.includes('k-startup.go.kr')) return url
+
+        const base = 'https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do'
+        const pbancMatch = url.match(/pbancSn=(\d+)/i)
+        if (pbancMatch?.[1]) return `${base}?schM=view&pbancSn=${pbancMatch[1]}`
+
+        const goViewMatch = url.match(/go_view(?:_blank)?\((\d+)\)/i)
+        if (goViewMatch?.[1]) return `${base}?schM=view&pbancSn=${goViewMatch[1]}`
+
+        const searchMatch = url.match(/[?&]schStr=([^&]+)/i)
+        const decodedSearch = searchMatch?.[1] ? decodeURIComponent(searchMatch[1].replace(/\+/g, ' ')) : ''
+        const searchTerm = normalizeKStartupSearchTerm(title || decodedSearch)
+        if (!searchTerm) return base
+        return `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
+    }
+
+    const extractSupportAmountFromDetail = (html?: string) => {
+        if (!html) return ''
+        const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+        const sectionMatch = text.match(/(?:지원\s*내용|지원\s*규모|지원\s*금액|사업화\s*자금)\s*:?\s*([^\.\n]{4,120})/i)
+        if (sectionMatch?.[1]) return sectionMatch[1].trim()
+        const amountMatch = text.match(/(?:최대|MAX|up to)\s*\d+(?:[.,]\d+)?\s*(?:억원|천만원|백만원|만원|원)?/i)
+        return amountMatch?.[0]?.trim() || ''
+    }
+
+    const extractPeriodFromDetail = (html?: string) => {
+        if (!html) return ''
+        const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+        const rangeMatch = text.match(/(20\d{2}[.\-/]\d{1,2}[.\-/]\d{1,2}\s*(?:~|-)\s*20\d{2}[.\-/]\d{1,2}[.\-/]\d{1,2})/)
+        if (rangeMatch?.[1]) return rangeMatch[1].replace(/\s+/g, ' ').trim()
+        return ''
+    }
+
+    const officialUrl = getOfficialUrl(policy.url, policy.title)
+    const supportAmountForDisplay =
+        policy.supportAmount && !/^(null|undefined|\s*|미정)$/i.test(policy.supportAmount)
+            ? policy.supportAmount
+            : extractSupportAmountFromDetail(policy.detailContent) || '미정'
+    const periodFromDetail = extractPeriodFromDetail(policy.detailContent)
+    const applicationPeriodForDisplay =
+        policy.applicationPeriod && !/^(null|undefined|\s*)$/i.test(policy.applicationPeriod)
+            ? policy.applicationPeriod
+            : periodFromDetail || '상시'
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
@@ -175,7 +228,7 @@ export default function PolicyDetailPage() {
             <div className="max-w-4xl mx-auto px-4 py-6 space-y-6 relative z-10">
 
                 {/* 1. Official Source Link (Top Priority) */}
-                {policy.url && (
+                {officialUrl && (
                     <div className="glass-card rounded-2xl p-6 text-slate-900">
                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                             <div className="flex items-start gap-4">
@@ -193,7 +246,7 @@ export default function PolicyDetailPage() {
                                 </div>
                             </div>
                             <a
-                                href={policy.url}
+                                href={officialUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-sky-300 hover:bg-sky-200 text-slate-900 rounded-full font-bold transition-all shadow-md hover:shadow-lg whitespace-nowrap"
@@ -245,24 +298,26 @@ export default function PolicyDetailPage() {
                         <div className="bg-white/80 p-4 rounded-lg border border-slate-100">
                             <p className="text-xs text-slate-500 font-bold mb-1">지원 내용</p>
                             <p className="font-semibold text-slate-900">
-                                {policy.url ? (
+                                {officialUrl ? (
                                     <a
-                                        href={policy.url}
+                                        href={officialUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-sky-600 hover:text-sky-700 hover:underline flex items-center gap-1 transition-colors"
                                     >
-                                        {policy.supportAmount}
+                                        {supportAmountForDisplay}
                                         <ExternalLink className="w-3 h-3" />
                                     </a>
                                 ) : (
-                                    policy.supportAmount
+                                    supportAmountForDisplay
                                 )}
                             </p>
                         </div>
                         <div className="bg-white/80 p-4 rounded-lg border border-slate-100">
                             <p className="text-xs text-slate-500 font-bold mb-1">신청 기간</p>
-                            <p className="font-semibold text-slate-900">{policy.applicationPeriod || '상시'}</p>
+                            <p className="font-semibold text-slate-900">
+                                {applicationPeriodForDisplay}
+                            </p>
                         </div>
 
                         {/* 소관기관 */}

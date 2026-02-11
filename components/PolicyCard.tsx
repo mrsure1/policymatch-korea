@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Policy } from '@/lib/mockPolicies';
 import { Clock, TrendingUp, ExternalLink } from 'lucide-react';
-import { getDocumentCount, getRoadmapCount } from '@/lib/utils/policyCounts';
+import { getDocumentCount, getPolicySummary, getRoadmapCount } from '@/lib/utils/policyCounts';
 
 interface PolicyCardProps {
     policy: Policy;
@@ -46,6 +46,7 @@ export default function PolicyCard({ policy, variant = 'default' }: PolicyCardPr
     };
 
     const source = getSourceMeta();
+    const summaryText = getPolicySummary(policy.summary, policy.detailContent) || '공고문 요약을 준비 중입니다.';
     const showAgency = policy.agency && policy.agency !== '정부기관' && policy.agency !== source.label;
 
     const variantClass =
@@ -81,7 +82,7 @@ export default function PolicyCard({ policy, variant = 'default' }: PolicyCardPr
 
                 {/* Summary */}
                 <p className="text-slate-700 text-sm mb-4 line-clamp-2 flex-1">
-                    {policy.summary}
+                    {summaryText}
                 </p>
 
                 {/* Info */}
@@ -99,7 +100,7 @@ export default function PolicyCard({ policy, variant = 'default' }: PolicyCardPr
                 {/* CTA */}
                 <div className="mt-auto pt-4 border-t border-slate-200 flex items-center justify-between">
                     <span className="text-sm text-slate-600">
-                        로드맵 {getRoadmapCount(policy.roadmap)}단계 • 서류 {getDocumentCount(policy.documents)}개
+                        로드맵 {getRoadmapCount(policy.roadmap, policy.detailContent)}단계 • 서류 {getDocumentCount(policy.documents, policy.detailContent)}개
                     </span>
                     <ExternalLink className="w-4 h-4 text-sky-600" />
                 </div>

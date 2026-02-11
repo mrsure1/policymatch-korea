@@ -19,8 +19,9 @@ function stripHtml(html: string): string {
 }
 
 export function getPolicySummary(summary: string | undefined, detailContent?: string): string {
+    const genericSummaryPattern = /(요약정보\s*없음|요약정보가\s*없습니다|상세\s*내용\s*참조|내용\s*참조|공고문\s*참조|홈페이지\s*참조)/i;
     // 1. If valid summary exists, use it
-    if (summary && summary.trim().length > 10 && !summary.includes('요약정보가 없습니다')) return summary;
+    if (summary && summary.trim().length > 10 && !genericSummaryPattern.test(summary)) return summary;
 
     if (!detailContent) return '';
 
