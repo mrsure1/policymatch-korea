@@ -115,14 +115,39 @@ function splitDocumentName(text: string): string[] {
     cleaned = cleaned.replace(/\s*(필수|우대\/추가)\s*$/g, '');
     if (!cleaned) return [];
 
-    const commaParts = cleaned
+    // Protect bracketed translations like "(Consent to provision, use, and collection...)"
+    // so punctuation inside brackets does not split one document into multiple items.
+    const protectedTokens: string[] = [];
+    const protectedText = cleaned.replace(/\([^()]*\)|\[[^\]]*\]|「[^」]*」/g, (segment) => {
+        const token = `__DOC_TOKEN_${protectedTokens.length}__`;
+        protectedTokens.push(segment);
+        return token;
+    });
+
+    const restoreTokens = (value: string) =>
+        value.replace(/__DOC_TOKEN_(\d+)__/g, (_, index) => protectedTokens[Number(index)] || '');
+
+    const commaParts = protectedText
         .split(/\s*(?:,|·|ㆍ|;|\/)\s*/g)
         .map((part) => part.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .map(restoreTokens);
 
     const results: string[] = [];
     for (const part of commaParts) {
-        const andParts = part.split(/\s+및\s+/).map((item) => item.trim()).filter(Boolean);
+        const andProtectedTokens: string[] = [];
+        const andProtectedPart = part.replace(/\([^()]*\)|\[[^\]]*\]|「[^」]*」/g, (segment) => {
+            const token = `__DOC_AND_TOKEN_${andProtectedTokens.length}__`;
+            andProtectedTokens.push(segment);
+            return token;
+        });
+
+        const andParts = andProtectedPart
+            .split(/\s+및\s+/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .map((item) => item.replace(/__DOC_AND_TOKEN_(\d+)__/g, (_, index) => andProtectedTokens[Number(index)] || ''));
+
         if (andParts.length > 1) {
             const keywordHits = andParts.filter((item) => DOCUMENT_KEYWORD_PATTERN.test(item)).length;
             if (keywordHits >= 2) {
