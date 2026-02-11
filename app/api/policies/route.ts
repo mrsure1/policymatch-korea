@@ -94,9 +94,10 @@ function stripHtml(text?: string | null): string {
 }
 
 const SUMMARY_NOISE_PATTERN = /\b(\uC0C8\uB85C\uC6B4\uAC8C\uC2DC\uAE00|\uC0C8\s*\uAE00|\uC2E0\uADDC\s*\uAC8C\uC2DC\uAE00|NEW)\b/gi
-const SUMMARY_GENERIC_PATTERN = /(\uC0C1\uC138\s*\uB0B4\uC6A9\s*\uCC38\uC870|\uB0B4\uC6A9\s*\uCC38\uC870|\uD648\uD398\uC774\uC9C0\s*\uCC38\uC870|\uACF5\uACE0\uBB38\s*\uCC38\uC870|\uBBF8\uC815|\uD574\uB2F9\s*\uC5C6\uC74C)/i
+const SUMMARY_GENERIC_PATTERN = /(\uC694\uC57D\s*\uC815\uBCF4\s*\uC5C6\uC74C|\uC694\uC57D\s*\uC815\uBCF4\uAC00\s*\uC5C6\uC2B5\uB2C8\uB2E4|\uC0C1\uC138\s*\uB0B4\uC6A9\s*\uCC38\uC870|\uB0B4\uC6A9\s*\uCC38\uC870|\uD648\uD398\uC774\uC9C0\s*\uCC38\uC870|\uACF5\uACE0\uBB38\s*\uCC38\uC870|\uBBF8\uC815|\uD574\uB2F9\s*\uC5C6\uC74C)/i
 const SUMMARY_META_PATTERN = /\|\s*(?:\uB9C8\uAC10|\uB9C8\uAC10\uC77C|\uB9C8\uAC10\uC77C\uC790|\uC870\uD68C|\uC811\uC218|\uB4F1\uB85D|\uAE30\uAC04|\uACF5\uACE0\uC77C)\b/i
 const SUMMARY_SKIP_PATTERN = /(\uACF5\uACE0\uBB38\s*\uCC38\uC870|\uD648\uD398\uC774\uC9C0\s*\uCC38\uC870|\uC790\uC138\uD55C\s*\uB0B4\uC6A9|\uC790\uC138\uD55C\s*\uC0AC\uD56D|\uC0C1\uC138\s*\uB0B4\uC6A9|\uBCF8\uBB38\s*\uCC38\uC870)/i
+const SUMMARY_PLAN_ANNOUNCEMENT_PATTERN = /([^.!?]*(?:\uBAA8\uC9D1\uACC4\uD68D|\uBAA8\uC9D1\s*\uACF5\uACE0)[^.!?]*(?:\uB2E4\uC74C\uACFC\s*\uAC19\uC774\s*)?\uACF5\uACE0\uD569\uB2C8\uB2E4\.?)/i
 const SUMMARY_KEYWORDS = [
     '\uBAA8\uC9D1',
     '\uC9C0\uC6D0',
@@ -151,6 +152,12 @@ function extractSummaryFromContent(rawContent?: string | null, title?: string | 
     text = text.replace(SUMMARY_NOISE_PATTERN, ' ')
     text = text.replace(/\s+/g, ' ').trim()
     if (!text) return ''
+
+    const planAnnouncementMatch = text.match(SUMMARY_PLAN_ANNOUNCEMENT_PATTERN)
+    if (planAnnouncementMatch?.[1]) {
+        const planText = cleanSummaryText(planAnnouncementMatch[1])
+        if (planText.length > 20) return planText
+    }
 
     const sentences = splitSummarySentences(text)
     const selected: string[] = []
