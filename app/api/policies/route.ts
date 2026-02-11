@@ -24,6 +24,66 @@ function cleanKStartupSearchTerm(title?: string): string {
     return cleaned
 }
 
+function extractCoreSearchPhrase(text: string): string | undefined {
+    const normalized = cleanKStartupSearchTerm(text)
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/\[[^\]]*]/g, ' ')
+        .replace(/[「」『』【】<>]/g, ' ')
+        .replace(/[~!@#$%^&*_=+|;:'",.?/\\-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    if (!normalized) return undefined
+
+    const stopwords = new Set([
+        '공고', '모집', '안내', '사업', '지원', '대상', '신청', '접수', '예비', '년도', '년', '및', '관련', '운영',
+    ])
+    const tokens = normalized
+        .split(' ')
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .filter((t) => !stopwords.has(t))
+
+    const priority = tokens.find((t) => /(사업|패키지|프로그램|바우처|아카데미|펀드|창업|재창업|수출)/.test(t) && t.length >= 4)
+    if (priority) {
+        const second = tokens.find((t) => t !== priority && t.length >= 2)
+        return second ? `${priority} ${second}` : priority
+    }
+
+    const longToken = tokens.find((t) => t.length >= 4)
+    if (longToken) {
+        const second = tokens.find((t) => t !== longToken && t.length >= 2)
+        return second ? `${longToken} ${second}` : longToken
+    }
+    return tokens.slice(0, 2).join(' ') || undefined
+}
+
+function buildKStartupSearchCandidates(title?: string, existingSearch?: string): string[] {
+    const cleanedTitle = cleanKStartupSearchTerm(title || '')
+    const cleanedExisting = cleanKStartupSearchTerm(existingSearch || '')
+    const withoutParen = cleanedTitle
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/\[[^\]]*]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    const stripped = withoutParen
+        .replace(/\b20\d{2}\s*년도?\b/g, ' ')
+        .replace(/\b20\d{2}\s*년\b/g, ' ')
+        .replace(/\b(?:모집공고|모집\s*공고|모집|공고|시행계획|사업공고)\b/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    const core = extractCoreSearchPhrase(stripped || withoutParen || cleanedTitle || cleanedExisting)
+
+    const candidates = [
+        core,
+        stripped,
+        withoutParen,
+        cleanedExisting,
+        cleanedTitle,
+    ].filter((v): v is string => Boolean(v && v.trim()))
+
+    return Array.from(new Set(candidates.map((v) => v.trim())))
+}
+
 function extractAgencyFallback(title?: string, summary?: string): string | undefined {
     const t = (title || '').trim()
     const s = (summary || '').trim()
@@ -569,6 +629,17 @@ function normalizeApplicationPeriodText(value?: string | null): string | null {
     return null
 }
 
+function computeDDayFromNormalizedPeriod(period?: string | null): number | null {
+    if (!period) return null
+    const text = stripHtml(period)
+    if (!text) return null
+    if (/(\uC0C1\uC2DC|\uC218\uC2DC|\uC608\uC0B0\s*\uC18C\uC9C4|\uC608\uC0B0\uC18C\uC9C4)/.test(text)) return null
+    const range = extractDateRangeFromText(text)
+    if (!range) return null
+    const diff = range.end.getTime() - Date.now()
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+}
+
 function computeDDay(applicationPeriod?: string | null, contentSummary?: string | null, rawContent?: string | null): number | null {
     const combined = [applicationPeriod, contentSummary, rawContent].filter(Boolean).join(' ')
     const text = stripHtml(combined)
@@ -639,8 +710,8 @@ async function fetchMetaFromUrl(
 
         const isKStartupSource = url.toLowerCase().includes('k-startup.go.kr')
         if (isKStartupSource && /go_view\(\d+\)/.test(html)) {
-            const searchTerm = cleanKStartupSearchTerm(extractKStartupSearchTerm(url) || '')
-            const resolvedId = extractKStartupPbancSn(html, searchTerm || '')
+            const searchTerm = buildKStartupSearchCandidates(policyTitle || '', extractKStartupSearchTerm(url) || '')[0] || ''
+            const resolvedId = extractKStartupPbancSn(html, searchTerm || policyTitle || '')
             if (resolvedId) {
                 const detailUrl = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=view&pbancSn=${resolvedId}`
                 try {
@@ -778,21 +849,27 @@ function extractKStartupSectionItems(html: string, sectionTitle: string): string
 }
 
 async function fetchKStartupMetaByTitle(title: string): Promise<{ roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] } | null> {
-    const searchTerm = cleanKStartupSearchTerm(title)
-    if (!searchTerm) return null
-    const listUrl = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=list&schStr=${encodeURIComponent(searchTerm)}`
+    const searchTerms = buildKStartupSearchCandidates(title)
+    if (searchTerms.length === 0) return null
     try {
-        const listResponse = await fetch(listUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
-            },
-            cache: 'no-store',
-        })
-        if (!listResponse.ok) return null
-        const listHtml = await listResponse.text()
-        const pbancSn = extractKStartupPbancSn(listHtml, title)
-        if (!pbancSn) return null
-        const detailUrl = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=view&pbancSn=${pbancSn}`
+        let detailUrl: string | null = null
+        for (const searchTerm of searchTerms.slice(0, 4)) {
+            const listUrl = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=list&schStr=${encodeURIComponent(searchTerm)}`
+            const listResponse = await fetch(listUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+                },
+                cache: 'no-store',
+            })
+            if (!listResponse.ok) continue
+            const listHtml = await listResponse.text()
+            const pbancSn = extractKStartupPbancSn(listHtml, title)
+            if (!pbancSn) continue
+            detailUrl = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=view&pbancSn=${pbancSn}`
+            break
+        }
+        if (!detailUrl) return null
+
         const detailResponse = await fetch(detailUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
@@ -1142,7 +1219,7 @@ function normalizeKStartupUrl(
         return `${base}?schM=view&pbancSn=${pbancSn}`
     }
     const existingSearch = extractKStartupSearchTerm(url)
-    const searchTerm = cleanKStartupSearchTerm(title) || existingSearch
+    const searchTerm = buildKStartupSearchCandidates(title, existingSearch)[0]
     if (searchTerm) {
         return `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
     }
@@ -1157,6 +1234,15 @@ function normalizeForMatch(text: string): string {
         .replace(/[^0-9a-z\uAC00-\uD7A3]/gi, '')
 }
 
+function tokenizeForMatch(text: string): string[] {
+    return stripHtml(text)
+        .toLowerCase()
+        .replace(/[^0-9a-z\uAC00-\uD7A3\s]/gi, ' ')
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 2)
+}
+
 function extractKStartupSearchTerm(url: string): string | undefined {
     const match = url.match(/[?&]schStr=([^&]+)/)
     if (!match?.[1]) return undefined
@@ -1168,7 +1254,9 @@ function extractKStartupSearchTerm(url: string): string | undefined {
 }
 
 function extractKStartupPbancSn(html: string, title: string): string | undefined {
-    const normalizedTitle = normalizeForMatch(cleanKStartupSearchTerm(title))
+    const candidates = buildKStartupSearchCandidates(title)
+    const normalizedCandidates = candidates.map((c) => normalizeForMatch(c)).filter(Boolean)
+    const tokenCandidates = candidates.map((c) => tokenizeForMatch(c)).filter((tokens) => tokens.length > 0)
     const matches: Array<{ id: string; index: number }> = []
     const goViewRegex = /go_view\((\d+)\)/g
     let match: RegExpExecArray | null
@@ -1184,7 +1272,7 @@ function extractKStartupPbancSn(html: string, title: string): string | undefined
     }
 
     // Avoid linking to an unrelated first result when title matching is not reliable.
-    if (!normalizedTitle) return undefined
+    if (normalizedCandidates.length === 0) return undefined
 
     for (const item of matches) {
         const window = html.slice(item.index, item.index + 800)
@@ -1194,7 +1282,15 @@ function extractKStartupPbancSn(html: string, title: string): string | undefined
         if (!candidateRaw) continue
         const candidate = normalizeForMatch(candidateRaw)
         if (!candidate) continue
-        if (candidate.includes(normalizedTitle) || normalizedTitle.includes(candidate)) {
+        if (normalizedCandidates.some((needle) => candidate.includes(needle) || needle.includes(candidate))) {
+            return item.id
+        }
+        const candidateTokens = new Set(tokenizeForMatch(candidateRaw))
+        const hasTokenMatch = tokenCandidates.some((tokens) => {
+            const overlap = tokens.filter((token) => candidateTokens.has(token)).length
+            return overlap >= Math.min(2, tokens.length)
+        })
+        if (hasTokenMatch) {
             return item.id
         }
     }
@@ -1238,34 +1334,37 @@ async function resolveKStartupDetailUrl(
     }
 
     const existingSearch = extractKStartupSearchTerm(url)
-    const searchTerm = cleanKStartupSearchTerm(title) || existingSearch
-    const searchUrl = searchTerm
-        ? `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
-        : url || base
+    const candidates = buildKStartupSearchCandidates(title, existingSearch)
+    const fallbackUrl = candidates[0]
+        ? `${base}?schM=list&schStr=${encodeURIComponent(candidates[0])}`
+        : (url || base)
 
-    if (!searchTerm) return searchUrl
+    if (candidates.length === 0) return fallbackUrl
 
     try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000)
-        const response = await fetch(searchUrl, {
-            signal: controller.signal,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
-            },
-        })
-        clearTimeout(timeoutId)
-        if (!response.ok) return searchUrl
-        const html = await response.text()
-        const resolvedId = extractKStartupPbancSn(html, title)
-        if (resolvedId) {
-            return `${base}?schM=view&pbancSn=${resolvedId}`
+        for (const searchTerm of candidates.slice(0, 4)) {
+            const searchUrl = `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 5000)
+            const response = await fetch(searchUrl, {
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+                },
+            })
+            clearTimeout(timeoutId)
+            if (!response.ok) continue
+            const html = await response.text()
+            const resolvedId = extractKStartupPbancSn(html, title)
+            if (resolvedId) {
+                return `${base}?schM=view&pbancSn=${resolvedId}`
+            }
         }
     } catch {
-        return searchUrl
+        return fallbackUrl
     }
 
-    return searchUrl
+    return fallbackUrl
 }
 
 // DB 데이터 → UI 타입 변환
@@ -1280,6 +1379,8 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     const computedPeriod = computeApplicationPeriod(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
     const computedDDayRaw = computeDDay(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
     const computedDDay = Number.isFinite(computedDDayRaw) ? computedDDayRaw : null
+    const finalPeriod = normalizeApplicationPeriodText(computedPeriod) || normalizeApplicationPeriodText(cleanedPeriod) || '\uC0C1\uC2DC'
+    const syncedDDay = computeDDayFromNormalizedPeriod(finalPeriod)
     const normalizedRoadmap: PolicyRoadmapStep[] = normalizeRoadmap(dbPolicy.roadmap)
     const normalizedDocuments: PolicyDocument[] = normalizeDocuments(dbPolicy.documents)
     const roadmapFallback: PolicyRoadmapStep[] = normalizedRoadmap.length > 0
@@ -1302,8 +1403,8 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
         title: cleanedTitle || '제목 없음',
         summary: summaryFallback || '',
         supportAmount: dbPolicy.amount || '미정',
-        dDay: computedDDay ?? dbPolicy.d_day ?? 999,
-        applicationPeriod: normalizeApplicationPeriodText(computedPeriod) || normalizeApplicationPeriodText(cleanedPeriod) || '\uC0C1\uC2DC',
+        dDay: syncedDDay ?? computedDDay ?? dbPolicy.d_day ?? 999,
+        applicationPeriod: finalPeriod,
         agency: dbPolicy.agency || extractAgencyFallback(cleanedTitle, cleanedSummary) || sourcePlatform || '정부기관',
         sourcePlatform,
         url: normalizeKStartupUrl(dbPolicy.link || dbPolicy.url || undefined, dbPolicy.title, dbPolicy.source_site),
@@ -1392,6 +1493,8 @@ export async function GET() {
                 if (fetched) {
                     if (needsDday && fetched.dDay !== null) mapped.dDay = fetched.dDay
                     if (needsPeriod && fetched.applicationPeriod) mapped.applicationPeriod = fetched.applicationPeriod
+                    const syncedDdayFromPeriod = computeDDayFromNormalizedPeriod(mapped.applicationPeriod)
+                    if (syncedDdayFromPeriod !== null) mapped.dDay = syncedDdayFromPeriod
                     if (needsRoadmap && fetched.roadmap.length > 0) {
                         mapped.roadmap = expandCommaSeparatedRoadmap(fetched.roadmap).slice(0, 12)
                     }
