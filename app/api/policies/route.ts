@@ -651,15 +651,7 @@ function computeDDay(applicationPeriod?: string | null, contentSummary?: string 
         return Math.ceil(diff / (1000 * 60 * 60 * 24))
     }
 
-    const dates = extractDatesFromText(text)
-    if (dates.length === 0) {
-        if (/(상시|수시|예산\s*소진|예산소진)/.test(text)) return null
-        return null
-    }
-
-    const latest = dates.reduce((acc, cur) => (cur > acc ? cur : acc), dates[0])
-    const diff = latest.getTime() - Date.now()
-    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+    return null
 }
 
 function isMeaningfulApplicationPeriod(value?: string | null): boolean {
@@ -1400,6 +1392,8 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     const computedDDay = Number.isFinite(computedDDayRaw) ? computedDDayRaw : null
     const finalPeriod = normalizeApplicationPeriodText(computedPeriod) || normalizeApplicationPeriodText(cleanedPeriod) || '\uC0C1\uC2DC'
     const syncedDDay = computeDDayFromNormalizedPeriod(finalPeriod)
+    const dbDdayRaw = typeof dbPolicy.d_day === 'number' && Number.isFinite(dbPolicy.d_day) ? dbPolicy.d_day : null
+    const dbDday = (dbDdayRaw !== null && dbDdayRaw >= -30 && dbDdayRaw <= 370) ? dbDdayRaw : null
     const normalizedRoadmap: PolicyRoadmapStep[] = normalizeRoadmap(dbPolicy.roadmap)
     const normalizedDocuments: PolicyDocument[] = normalizeDocuments(dbPolicy.documents)
     const roadmapFallback: PolicyRoadmapStep[] = normalizedRoadmap.length > 0
@@ -1422,7 +1416,7 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
         title: cleanedTitle || '제목 없음',
         summary: summaryFallback || '',
         supportAmount: dbPolicy.amount || '미정',
-        dDay: syncedDDay ?? computedDDay ?? dbPolicy.d_day ?? 999,
+        dDay: syncedDDay ?? computedDDay ?? dbDday ?? 999,
         applicationPeriod: finalPeriod,
         agency: dbPolicy.agency || extractAgencyFallback(cleanedTitle, cleanedSummary) || sourcePlatform || '정부기관',
         sourcePlatform,
