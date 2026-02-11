@@ -1171,7 +1171,8 @@ function extractKStartupPbancSn(html: string, title: string): string | undefined
         return pbancMatch?.[1]
     }
 
-    if (!normalizedTitle) return matches[0].id
+    // Avoid linking to an unrelated first result when title matching is not reliable.
+    if (!normalizedTitle) return undefined
 
     for (const item of matches) {
         const window = html.slice(item.index, item.index + 800)
@@ -1186,7 +1187,13 @@ function extractKStartupPbancSn(html: string, title: string): string | undefined
         }
     }
 
-    return matches[0].id
+    return undefined
+}
+
+function extractKStartupPbancFromUrl(url?: string | null): string | undefined {
+    if (!url) return undefined
+    const match = url.match(/[?&]pbancSn=(\d+)/i)
+    return match?.[1]
 }
 
 async function resolveKStartupDetailUrl(
@@ -1386,9 +1393,19 @@ export async function GET() {
 
         
         const kstartupBestByTitle = new Map<string, Policy>()
+        const kstartupBestByPbanc = new Map<string, Policy>()
         for (const policy of policies) {
             if (!isKStartupPolicy(policy)) continue
             const key = normalizeTitleKey(policy.title)
+            const pbancKey = extractKStartupPbancFromUrl(policy.url)
+
+            if (pbancKey) {
+                const byPbanc = kstartupBestByPbanc.get(pbancKey)
+                if (!byPbanc || (isKStartupViewUrl(policy.url) && !isKStartupViewUrl(byPbanc.url))) {
+                    kstartupBestByPbanc.set(pbancKey, policy)
+                }
+            }
+
             if (!key) continue
             const best = kstartupBestByTitle.get(key)
             if (!best) {
@@ -1400,11 +1417,12 @@ export async function GET() {
             }
         }
 
-        const seenKstartupTitles = new Set<string>()
+        const seenKstartupKeys = new Set<string>()
         const normalizedPolicies = policies.map((policy) => {
             if (!isKStartupPolicy(policy)) return policy
             const key = normalizeTitleKey(policy.title)
-            const best = kstartupBestByTitle.get(key)
+            const pbancKey = extractKStartupPbancFromUrl(policy.url)
+            const best = (pbancKey ? kstartupBestByPbanc.get(pbancKey) : undefined) || kstartupBestByTitle.get(key)
             if (best?.url && policy.url !== best.url) {
                 policy.url = best.url
             }
@@ -1412,9 +1430,10 @@ export async function GET() {
         }).filter((policy) => {
             if (!isKStartupPolicy(policy)) return true
             const key = normalizeTitleKey(policy.title)
-            if (!key) return true
-            if (seenKstartupTitles.has(key)) return false
-            seenKstartupTitles.add(key)
+            const pbancKey = extractKStartupPbancFromUrl(policy.url)
+            const dedupeKey = pbancKey ? `pbanc:${pbancKey}` : (key ? `title:${key}` : `id:${policy.id}`)
+            if (seenKstartupKeys.has(dedupeKey)) return false
+            seenKstartupKeys.add(dedupeKey)
             return true
         })
 
