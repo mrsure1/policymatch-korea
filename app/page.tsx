@@ -240,12 +240,7 @@ export default function HomePage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="glass-dark px-4 py-2 rounded-full text-xs font-semibold text-slate-200">
-              매칭 수
-              <span className="ml-2 text-xl font-extrabold text-sky-200 font-sans tabular-nums tracking-tight leading-none drop-shadow-sm">
-                {loading ? '...' : matchedPolicies.length}
-              </span>
-            </div>
+
             <Link
               href="/archive"
               className="flex items-center gap-1.5 text-sm font-bold text-slate-900 bg-sky-300 px-3 py-2 rounded-full hover:bg-sky-200 transition-colors"
