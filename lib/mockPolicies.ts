@@ -21,6 +21,7 @@ export interface PolicyDocument {
     category: '필수' | '우대/추가';
     whereToGet: string;
     link?: string;
+    description?: string;  // 서류 설명 (예: "예비창업자의 경우 제출 x")
 }
 
 export interface Policy {

@@ -290,13 +290,12 @@ export function getRequiredDocuments(documents: PolicyDocument[] | undefined, de
 
     const stripped = stripHtml(detailContent);
 
-    // 2. Try to find "제출서류", "신청서류", "구비서류" section
+    // 제출서류 섹션 찾기
     const docKeywords = ['제출서류', '신청서류', '구비서류', '필수서류', '신청 시 요청하는 정보'];
     let docText = '';
 
-    // Look for section headers
     for (const keyword of docKeywords) {
-        const regex = new RegExp(`${keyword}[:\\s]*(?:\\n|\\s|$)([\\s\\S]*?)(?:\\n[가-힣]+(?:절차|방법|안내|문의|사항|서류)|\\n\\d+\\.|$)`, 'i');
+        const regex = new RegExp(`${keyword}[:\\s]*(?:\\n|\\s|$)([\\s\\S]*?)(?:\\n[가-힣]+(?:절차|방법|안내|문의|사항)|\\n\\d+\\.|$)`, 'i');
         const match = stripped.match(regex);
         if (match && match[1]) {
             docText = match[1].trim();
@@ -304,21 +303,63 @@ export function getRequiredDocuments(documents: PolicyDocument[] | undefined, de
         }
     }
 
-    if (docText) {
-        // Remove common disclaimer text in document section
-        docText = docText.replace(/제출하신\s*서류는\s*사업운영기관에서\s*관리되오니.*$/i, '');
-        docText = docText.replace(/인베스트 경기 지침 참고/g, ''); // Specific noise removal
-        docText = docText.replace(/개인정보포함/g, ''); // User screenshot specific
+    if (!docText) return [];
 
+    // 불필요한 텍스트 제거
+    docText = docText.replace(/제출하신\s*서류는\s*사업운영기관에서\s*관리되오니.*$/i, '');
+    docText = docText.replace(/상기\s*\d+가지\s*서류.*$/im, '');
+    docText = docText.replace(/인베스트 경기 지침 참고/g, '');
+    docText = docText.replace(/개인정보포함/g, '');
+
+    // 라인별로 분리
+    const lines = docText.split('\n').map(l => l.trim()).filter(Boolean);
+    const result: PolicyDocument[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // 안내 문구나 압축파일 관련 텍스트 스킵
+        if (/^(※|제출하신|압축파일명|상기)/.test(line)) continue;
+
+        // 다음 라인 확인
+        const nextLine = i + 1 < lines.length ? lines[i + 1] : null;
+
+        // 현재 라인이 서류 제목인지 확인
+        // 1. 서류 키워드가 포함되어 있거나
+        // 2. 한글로만 구성되어 있고 다음 라인이 설명처럼 보이는 경우
+        const isDocumentTitle = DOCUMENT_KEYWORD_PATTERN.test(line) ||
+            (/^[가-힣\s']+$/.test(line) && line.length < 50);
+
+        if (isDocumentTitle) {
+            // 다음 라인이 설명인지 확인 (서류 키워드가 없고, 안내 문구도 아닌 경우)
+            const hasDescription = nextLine &&
+                !DOCUMENT_KEYWORD_PATTERN.test(nextLine) &&
+                !/^(※|제출하신|압축파일명|상기)/.test(nextLine) &&
+                nextLine.length < 100;  // 너무 긴 텍스트는 설명이 아닐 가능성
+
+            result.push({
+                name: line,
+                category: '필수',
+                whereToGet: '공고문 참조',
+                description: hasDescription ? nextLine : undefined
+            });
+
+            // 설명을 사용했으면 다음 라인 스킵
+            if (hasDescription) i++;
+        }
+    }
+
+    // 결과가 없으면 기존 방식으로 폴백
+    if (result.length === 0) {
         const docNames = splitDocumentName(docText);
         return docNames.map((name) => ({
             name: name,
-            category: '필수', // Default category since we don't know if it's required/optional
+            category: '필수',
             whereToGet: '공고문 참조',
         }));
     }
 
-    return [];
+    return result;
 }
 
 export function getRoadmapCount(value: unknown, detailContent?: string): number {

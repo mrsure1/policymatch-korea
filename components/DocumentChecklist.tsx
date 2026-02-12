@@ -45,16 +45,19 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
 
     const renderDocumentItem = (doc: PolicyDocument) => {
         const isChecked = checkedDocs.has(doc.name);
-        const lines = formatDocumentLines(doc.name);
-        const title = lines[0] || doc.name;
-        const details = lines.slice(1);
+
+        // description 필드가 있으면 사용, 없으면 기존 방식으로 파싱
+        const hasDescription = !!doc.description;
+        const lines = hasDescription ? [] : formatDocumentLines(doc.name);
+        const title = hasDescription ? doc.name : (lines[0] || doc.name);
+        const details = hasDescription ? [] : lines.slice(1);
 
         return (
             <div
                 key={doc.name}
                 className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all ${isChecked
-                        ? 'border-green-300 bg-green-50'
-                        : 'border-slate-200 bg-white hover:border-blue-300'
+                    ? 'border-green-300 bg-green-50'
+                    : 'border-slate-200 bg-white hover:border-blue-300'
                     }`}
             >
                 {/* 체크박스 */}
@@ -76,6 +79,15 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                             <h4 className={`font-semibold ${isChecked ? 'text-green-900' : 'text-slate-900'}`}>
                                 {title}
                             </h4>
+
+                            {/* description 필드가 있으면 표시 */}
+                            {hasDescription && doc.description && (
+                                <p className="mt-1 text-sm text-slate-600">
+                                    {doc.description}
+                                </p>
+                            )}
+
+                            {/* 기존 방식으로 파싱된 details 표시 */}
                             {details.length > 0 && (
                                 <ul className="mt-1 list-disc pl-5 space-y-1 text-sm text-slate-600">
                                     {details.map((line, idx) => (
@@ -85,8 +97,8 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                             )}
                         </div>
                         <span className={`text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap ${doc.category === '필수'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-blue-100 text-blue-700'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-blue-100 text-blue-700'
                             }`}>
                             {doc.category}
                         </span>
