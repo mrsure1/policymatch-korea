@@ -230,7 +230,7 @@ export default function HomePage() {
           <div>
             <h2 className="text-2xl font-bold text-slate-100">
               전체 매칭 결과
-              <span className="ml-2 text-2xl font-extrabold text-sky-200 font-sans tabular-nums tracking-tight leading-none drop-shadow-sm">
+              <span className="ml-2 text-2xl font-bold text-sky-200 tabular-nums">
                 {loading ? '...' : matchedPolicies.length}
               </span>
               개
