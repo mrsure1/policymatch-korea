@@ -230,7 +230,7 @@ export default function HomePage() {
           <div>
             <h2 className="text-2xl font-bold text-slate-100">
               전체 매칭 결과
-              <span className="ml-2 text-2xl font-bold text-sky-200 tabular-nums">
+              <span className="ml-2 text-2xl font-bold text-sky-200 tabular-nums" style={{ fontFamily: "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif" }}>
                 {loading ? '...' : matchedPolicies.length}
               </span>
               개
@@ -320,6 +320,6 @@ export default function HomePage() {
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 }
