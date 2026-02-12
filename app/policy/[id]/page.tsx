@@ -433,7 +433,7 @@ export default function PolicyDetailPage() {
                                 <Map className="w-5 h-5 text-blue-600" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900">신청 로드맵 ({getRoadmapCount(policy.roadmap, policy.detailContent)}단계)</h2>
+                                <h2 className="text-lg font-bold text-slate-900">신청 로드맵</h2>
                                 <p className="text-xs text-slate-500">단계별 신청 절차를 안내합니다</p>
                             </div>
                         </div>
@@ -449,7 +449,7 @@ export default function PolicyDetailPage() {
                                 <FileCheck className="w-5 h-5 text-green-600" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900">필요 서류 ({getDocumentCount(policy.documents, policy.detailContent)}개)</h2>
+                                <h2 className="text-lg font-bold text-slate-900">필요 서류</h2>
                                 <p className="text-xs text-slate-500">신청 시 필요한 서류를 확인하세요</p>
                             </div>
                         </div>
