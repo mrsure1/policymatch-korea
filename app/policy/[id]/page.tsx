@@ -428,15 +428,6 @@ export default function PolicyDetailPage() {
                 {/* 5. Action Roadmap */}
                 {getRoadmapCount(policy.roadmap, policy.detailContent) > 0 && (
                     <div className="glass-card rounded-2xl p-6 text-slate-900">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                <Map className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-bold text-slate-900">신청 로드맵</h2>
-                                <p className="text-xs text-slate-500">단계별 신청 절차를 안내합니다</p>
-                            </div>
-                        </div>
                         <RoadmapTimeline steps={getRoadmapSteps(policy.roadmap, policy.detailContent)} />
                     </div>
                 )}
@@ -444,15 +435,6 @@ export default function PolicyDetailPage() {
                 {/* 6. Required Documents */}
                 {getDocumentCount(policy.documents, policy.detailContent) > 0 && (
                     <div className="glass-card rounded-2xl p-6 text-slate-900">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                                <FileCheck className="w-5 h-5 text-green-600" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-bold text-slate-900">필요 서류</h2>
-                                <p className="text-xs text-slate-500">신청 시 필요한 서류를 확인하세요</p>
-                            </div>
-                        </div>
                         <DocumentChecklist documents={getRequiredDocuments(policy.documents, policy.detailContent)} />
                     </div>
                 )}
