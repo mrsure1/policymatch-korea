@@ -1,20 +1,32 @@
-﻿import type { PolicyRoadmapStep, PolicyDocument } from '@/lib/mockPolicies';
+import type { PolicyRoadmapStep, PolicyDocument } from '@/lib/mockPolicies';
 
-// Helper to strip HTML and clean text
+function decodeHtmlEntities(text: string): string {
+    if (!text) return '';
+    return text
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&apos;/gi, "'")
+        .replace(/&#039;/gi, "'")
+        .replace(/&nbsp;/gi, ' ');
+}
+
 function stripHtml(html: string): string {
     if (!html) return '';
-    return html
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        // Replace block elements with newlines
-        .replace(/<\/?(div|p|h[1-6]|li|tr|br|ul|ol|table|section|article|aside|header|footer)[^>]*>/gi, '\n')
-        // Remove all other tags (inline like b, span, etc)
-        .replace(/<[^>]+>/g, '')
-        .replace(/&nbsp;/gi, ' ')
+    return decodeHtmlEntities(
+        html
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<\/?(div|p|h[1-6]|li|tr|br|ul|ol|table|section|article|aside|header|footer)[^>]*>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+    )
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n')
-        .replace(/[ \t]+/g, ' ') // Collapse spaces but keep newlines
-        .replace(/\n\s*\n/g, '\n') // Collapse multiple newlines
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n\s*\n/g, '\n')
         .trim();
 }
 
@@ -100,7 +112,58 @@ function parseJsonValue(value: unknown): unknown {
 
 const DOCUMENT_EXCLUDE_PATTERN = /제출하신\s*서류는\s*사업운영기관에서\s*관리되오니.*$/i;
 const ROADMAP_SPLIT_PATTERN = /\s*(?:,|，|·|ㆍ|;|\/|및|그리고|→|->)\s*/g;
-const DOCUMENT_KEYWORD_PATTERN = /(신청서|계획서|동의서|증명서|확약서|등록증|등본|명부|보고서|제안서|서류|자료|증빙)/;
+const DOCUMENT_KEYWORD_PATTERN = /(신청서|계획서|동의서|증명서|확약서|등록증|등본|명부|보고서|제안서|서류|자료|증빙|사본|원본|PPT|PDF|HWP|확인서)/;
+
+function isInvalidDocumentName(name: string): boolean {
+    if (!name) return true;
+    const trimmed = name.trim();
+    if (trimmed.length < 2) return true;
+    if (/^[a-zA-Z0-9_./-]+$/.test(trimmed) && trimmed.length < 30) return true;
+    if (/https?:\/\/|www\./i.test(trimmed)) return true;
+    if (/^\d+$/.test(trimmed)) return true;
+    return false;
+}
+
+function isSubDescriptionLine(line: string): boolean {
+    if (!line) return true;
+    const t = line.trim();
+    if (/https?:\/\//i.test(t)) return true;
+    if (/의\s*경우\s*(제출|불필요|해당|x)/i.test(t)) return true;
+    if (/(?:작성\s*후\s*제출|접속\s*후|스캔\s*등|압축파일로\s*제출|확인증\s*제출\s*필수)/i.test(t)) return true;
+    if (/^공고에\s*첨부된/.test(t)) return true;
+    if ((t.match(/,/g) || []).length >= 2 && /등\s*$/.test(t)) return true;
+    if (t.length < 12 && /등\s*$/.test(t)) return true;
+    if (/^(상기|압축파일|제출하신|※|참고사항|문의)/.test(t)) return true;
+    if (/모두\s*스캔|압축파일로|압축파일명/.test(t)) return true;
+    // 제출 방법 안내: "변환하여", "병합하여", "~하여 제출"
+    if (/(?:변환하여|병합하여|하여\s*제출|로\s*제출$)/i.test(t)) return true;
+    // 금지/제한/주의: "설정 불가", "불이익"
+    if (/(?:설정\s*불가|불이익|미비\s*시)/i.test(t)) return true;
+    // 작성 안내: "이내로 작성", "양식을 사용"
+    if (/(?:이내로\s*작성|양식을\s*사용)/i.test(t)) return true;
+    // 파일 형식/제출 방식 안내
+    if (/(?:파일\s*및\s*메일|PDF\s*파일로\s*변환|제목\s*동일\s*설정)/i.test(t)) return true;
+    // 모아 찍기, 페이지 설정 등 인쇄/파일 관련 안내
+    if (/(?:모아\s*찍기|페이지\s*설정)/i.test(t)) return true;
+    return false;
+}
+
+function isInstructionOrNotice(line: string): boolean {
+    const t = line.trim();
+    if (/^상기\s*\d+/.test(t)) return true;
+    if (/모두\s*스캔\s*등을\s*하여/.test(t)) return true;
+    if (/압축파일명\s*[:：]/.test(t)) return true;
+    if (DOCUMENT_EXCLUDE_PATTERN.test(t)) return true;
+    if (/^(※|제출하신\s*서류|참고사항)/.test(t)) return true;
+    return false;
+}
+
+function isDocumentSectionTitle(line: string): boolean {
+    const t = line.trim();
+    if (/(?:제출|신청|구비|필수|필요|증빙)\s*서류/.test(t) && !/\d+\s*부/.test(t)) return true;
+    if (/서류\s*(?:안내|목록|제출)/.test(t)) return true;
+    return false;
+}
 
 function splitTextItems(text: string): string[] {
     return text
@@ -173,9 +236,12 @@ function splitRoadmapItems(text: string): string[] {
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
     if (!cleaned) return [];
 
-    // If text looks like "1. Step 2. Step 3. Step"
-    if (/\d+\./.test(cleaned)) {
-        return cleaned.split(/\d+\./).map(s => s.trim()).filter(Boolean);
+    // If text looks like "1. Step 2. Step"
+    // Use regex that matches "1." or "1)" but limits digits to 1-2 to avoid years (e.g. 2026.)
+    // Also requires space after dot/paren
+    const numberingRegex = /(?:^|\s)\d{1,2}[\.)]\s+/;
+    if (numberingRegex.test(cleaned)) {
+        return cleaned.split(numberingRegex).map(s => s.trim()).filter(Boolean);
     }
 
     return cleaned
@@ -229,15 +295,23 @@ function filterDocumentsArray(items: unknown[]): unknown[] {
 export function filterDocumentsForDisplay<T extends { name?: string }>(documents: T[]): T[] {
     const expanded: T[] = [];
     for (const doc of documents) {
-        const name = doc?.name || '';
+        const rawName = doc?.name || '';
+        const name = decodeHtmlEntities(rawName);
         if (isExcludedDocument(name)) continue;
+        if (isInvalidDocumentName(name)) continue;
+        if (isDocumentSectionTitle(name)) continue;
+        if (isSubDescriptionLine(name)) continue;
+        if (isInstructionOrNotice(name)) continue;
         const parts = splitDocumentName(name);
         if (parts.length <= 1) {
-            expanded.push(doc);
+            expanded.push({ ...doc, name });
             continue;
         }
         for (const part of parts) {
-            expanded.push({ ...doc, name: part });
+            const decoded = decodeHtmlEntities(part);
+            if (!isInvalidDocumentName(decoded) && !isSubDescriptionLine(decoded) && !isInstructionOrNotice(decoded)) {
+                expanded.push({ ...doc, name: decoded });
+            }
         }
     }
     return expanded;
@@ -274,7 +348,7 @@ export function getRoadmapSteps(roadmap: PolicyRoadmapStep[] | undefined, detail
         const parts = splitRoadmapItems(roadmapText);
         return parts.map((title, index) => ({
             step: index + 1,
-            title: title.replace(/^\d+\.\s*/, ''),
+            title: title.replace(/^\d+[\.)]\s*/, ''),
             description: '',
         }));
     }
@@ -295,7 +369,8 @@ export function getRequiredDocuments(documents: PolicyDocument[] | undefined, de
     let docText = '';
 
     for (const keyword of docKeywords) {
-        const regex = new RegExp(`${keyword}[:\\s]*(?:\\n|\\s|$)([\\s\\S]*?)(?:\\n[가-힣]+(?:절차|방법|안내|문의|사항)|\\n\\d+\\.|$)`, 'i');
+        // Removed \n\d+\. from stop condition to avoid stopping at the numbered list of documents itself
+        const regex = new RegExp(`${keyword}[:\\s]*(?:\\n|\\s|$)([\\s\\S]*?)(?:\\n[가-힣]+(?:절차|방법|안내|문의|사항)|$)`, 'i');
         const match = stripped.match(regex);
         if (match && match[1]) {
             docText = match[1].trim();
@@ -305,57 +380,86 @@ export function getRequiredDocuments(documents: PolicyDocument[] | undefined, de
 
     if (!docText) return [];
 
-    // 불필요한 텍스트 제거
-    docText = docText.replace(/제출하신\s*서류는\s*사업운영기관에서\s*관리되오니.*$/i, '');
-    docText = docText.replace(/상기\s*\d+가지\s*서류.*$/im, '');
     docText = docText.replace(/인베스트 경기 지침 참고/g, '');
     docText = docText.replace(/개인정보포함/g, '');
 
-    // 라인별로 분리
     const lines = docText.split('\n').map(l => l.trim()).filter(Boolean);
     const result: PolicyDocument[] = [];
 
+    // 불릿(•·)과 하이픈(-) 둘 다 쓰인 경우: 하이픈 줄은 상위 항목의 하위 설명
+    const hasBullets = lines.some(l => /^[•·]/.test(l));
+    const hasHyphens = lines.some(l => /^[-–—]\s/.test(l));
+    const hyphenIsSub = hasBullets && hasHyphens;
+
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+        let line = decodeHtmlEntities(lines[i]);
 
-        // 안내 문구나 압축파일 관련 텍스트 스킵
-        if (/^(※|제출하신|압축파일명|상기)/.test(line)) continue;
+        if (isInstructionOrNotice(line)) continue;
 
-        // 다음 라인 확인
-        const nextLine = i + 1 < lines.length ? lines[i + 1] : null;
+        if (hyphenIsSub && /^[-–—]\s/.test(line)) continue;
 
-        // 현재 라인이 서류 제목인지 확인
-        // 1. 서류 키워드가 포함되어 있거나
-        // 2. 한글로만 구성되어 있고 다음 라인이 설명처럼 보이는 경우
-        const isDocumentTitle = DOCUMENT_KEYWORD_PATTERN.test(line) ||
-            (/^[가-힣\s']+$/.test(line) && line.length < 50);
+        // 번호/불릿 제거 (숫자, 기호, 한글 번호 가./나./다./...)
+        line = line.replace(/^(?:\d+[\.)]|[-•·*]|[가-힣][\.)]\s)\s*/, '').trim();
+        if (!line) continue;
 
-        if (isDocumentTitle) {
-            // 다음 라인이 설명인지 확인 (서류 키워드가 없고, 안내 문구도 아닌 경우)
-            const hasDescription = nextLine &&
-                !DOCUMENT_KEYWORD_PATTERN.test(nextLine) &&
-                !/^(※|제출하신|압축파일명|상기)/.test(nextLine) &&
-                nextLine.length < 100;  // 너무 긴 텍스트는 설명이 아닐 가능성
+        if (isDocumentSectionTitle(line)) continue;
 
+        if (isInstructionOrNotice(line)) continue;
+        if (isInvalidDocumentName(line)) continue;
+        if (isSubDescriptionLine(line)) continue;
+
+        // 쉼표로 구분된 서류 (예: "지방세, 국세 완납 증명서")
+        const parts = splitDocumentName(line);
+        if (parts.length > 1) {
+            // 쉼표 분리 결과 중 유효한 서류 제목만
+            const validParts = parts
+                .map(decodeHtmlEntities)
+                .filter((p) => !isInvalidDocumentName(p) && !isSubDescriptionLine(p));
+
+            if (validParts.length > 0) {
+                // 전체를 하나의 서류명으로 취급할지, 개별로 나눌지 판단
+                // 원래 줄 전체에 서류 키워드가 있으면 하나로 합침
+                // (예: "지방세, 국세 완납 증명서" → 하나)
+                if (DOCUMENT_KEYWORD_PATTERN.test(line)) {
+                    result.push({
+                        name: decodeHtmlEntities(line),
+                        category: '필수',
+                        whereToGet: '공고문 바로가기에서 첨부파일 확인',
+                    });
+                } else {
+                    for (const part of validParts) {
+                        result.push({
+                            name: part,
+                            category: '필수',
+                            whereToGet: '공고문 바로가기에서 첨부파일 확인',
+                        });
+                    }
+                }
+            }
+            continue;
+        }
+
+        // 단일 서류 제목 판별
+        const looksLikeDocTitle = DOCUMENT_KEYWORD_PATTERN.test(line) ||
+            (/[가-힣]/.test(line) && line.length < 60 && !/의\s*경우/.test(line));
+
+        if (looksLikeDocTitle) {
             result.push({
-                name: line,
+                name: decodeHtmlEntities(line),
                 category: '필수',
-                whereToGet: '공고문 참조',
-                description: hasDescription ? nextLine : undefined
+                whereToGet: '공고문 바로가기에서 첨부파일 확인',
             });
-
-            // 설명을 사용했으면 다음 라인 스킵
-            if (hasDescription) i++;
         }
     }
 
-    // 결과가 없으면 기존 방식으로 폴백
     if (result.length === 0) {
-        const docNames = splitDocumentName(docText);
+        const docNames = splitDocumentName(docText)
+            .map(decodeHtmlEntities)
+            .filter((n) => !isInvalidDocumentName(n) && !isSubDescriptionLine(n) && !isInstructionOrNotice(n));
         return docNames.map((name) => ({
-            name: name,
-            category: '필수',
-            whereToGet: '공고문 참조',
+            name,
+            category: '필수' as const,
+            whereToGet: '공고문 바로가기에서 첨부파일 확인',
         }));
     }
 

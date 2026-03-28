@@ -9,6 +9,9 @@ beautifulsoup4>=4.12.0
 # Database
 supabase>=2.3.0
 
+# 웹 크롤링 (동적 페이지)
+playwright>=1.48.0
+
 # HWP 파일 파싱 (향후 구현)
 olefile>=0.47
 

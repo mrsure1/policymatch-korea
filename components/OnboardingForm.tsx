@@ -18,12 +18,12 @@ const optionClass = (selected: boolean, size: 'card' | 'chip' = 'card') => {
             : 'w-full rounded-xl border px-4 py-4 text-left transition-all bg-white/80 hover:bg-white hover:-translate-y-0.5 hover:shadow-md';
     const selectedClass =
         size === 'chip'
-            ? 'border-sky-400/80 bg-gradient-to-br from-sky-50 via-white to-indigo-50 text-slate-900 shadow-sm ring-1 ring-sky-300/30'
-            : 'border-sky-400/80 bg-gradient-to-br from-sky-50 via-white to-indigo-50 text-slate-900 shadow-md ring-1 ring-sky-300/40';
+            ? 'border-amber-400/70 bg-amber-50 text-slate-900 shadow-sm ring-1 ring-amber-300/40'
+            : 'border-amber-400/70 bg-amber-50/90 text-slate-900 shadow-md ring-1 ring-amber-300/30';
     const unselectedClass =
         size === 'chip'
-            ? 'border-slate-200/80 text-slate-700 hover:border-sky-300/70'
-            : 'border-slate-200/80 text-slate-700 hover:border-sky-300/70';
+            ? 'border-slate-200/80 text-slate-700 hover:border-amber-300/50'
+            : 'border-slate-200/80 text-slate-700 hover:border-amber-300/50';
     return `${base} ${selected ? selectedClass : unselectedClass}`;
 };
 
@@ -67,30 +67,30 @@ export default function OnboardingForm() {
                 {step === 0 && (
                     <div className="glass-card rounded-2xl p-10 text-center animate-fade-in text-slate-900">
                         <div className="mb-10">
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-500 mb-6 shadow-md">
-                                <Building2 className="w-8 h-8 text-white" />
+                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-amber-500 mb-6 shadow-lg">
+                                <Building2 className="w-8 h-8 text-slate-900" />
                             </div>
-                            <h1 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight leading-tight">
+                            <h1 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight leading-tight" style={{ fontFamily: 'var(--font-display)' }}>
                                 대한민국 정책자금<br />
-                                <span className="text-sky-600">맞춤 매칭 서비스</span>
+                                <span className="text-amber-600">맞춤 매칭 서비스</span>
                             </h1>
                             <p className="text-lg text-slate-600 mb-8 leading-relaxed max-w-xl mx-auto">
-                                복잡하고 어려운 정부 지원사업,<br />
-                                기업 프로필을 분석하여 귀사에 최적화된 공고를 찾아드립니다.
+                                복잡한 정부 지원사업,<br />
+                                기업 프로필을 분석해 맞는 공고를 찾아드립니다.
                             </p>
 
-                            <div className="flex flex-wrap justify-center gap-4 mb-10">
-                                <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-slate-100">
-                                    <TrendingUp className="w-4 h-4 text-slate-500" />
-                                    <span className="text-sm font-medium text-slate-700">실시간 데이터 분석</span>
+                            <div className="flex flex-wrap justify-center gap-3 mb-10">
+                                <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50/80 rounded-lg border border-amber-200/50">
+                                    <TrendingUp className="w-4 h-4 text-amber-600" />
+                                    <span className="text-sm font-semibold text-slate-700">실시간 데이터 분석</span>
                                 </div>
-                                <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-slate-100">
-                                    <FileText className="w-4 h-4 text-slate-500" />
-                                    <span className="text-sm font-medium text-slate-700">2026년 최신 공고 반영</span>
+                                <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50/80 rounded-lg border border-amber-200/50">
+                                    <FileText className="w-4 h-4 text-amber-600" />
+                                    <span className="text-sm font-semibold text-slate-700">2026년 최신 공고</span>
                                 </div>
-                                <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-slate-100">
-                                    <Sparkles className="w-4 h-4 text-slate-500" />
-                                    <span className="text-sm font-medium text-slate-700">100% 무료 서비스</span>
+                                <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50/80 rounded-lg border border-amber-200/50">
+                                    <Sparkles className="w-4 h-4 text-amber-600" />
+                                    <span className="text-sm font-semibold text-slate-700">100% 무료</span>
                                 </div>
                             </div>
                         </div>
@@ -98,7 +98,7 @@ export default function OnboardingForm() {
                         <div className="flex flex-col gap-4 max-w-md mx-auto">
                             <button
                                 onClick={handleNext}
-                                className="w-full px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-full hover:bg-slate-800 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                                className="w-full px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                             >
                                 무료로 매칭 시작하기
                                 <ChevronRight className="w-5 h-5" />
@@ -127,7 +127,7 @@ export default function OnboardingForm() {
                             </div>
                             <div className="w-full h-1.5 bg-slate-200/60 rounded-full overflow-hidden">
                                 <div
-                                    className="h-full bg-gradient-to-r from-sky-400 via-cyan-400 to-indigo-500 transition-all duration-300 ease-out rounded-full"
+                                    className="h-full bg-amber-500 transition-all duration-300 ease-out rounded-full"
                                     style={{ width: `${(step / totalSteps) * 100}%` }}
                                 />
                             </div>
@@ -149,7 +149,7 @@ export default function OnboardingForm() {
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-base font-bold">{type}</span>
-                                                    {profile.entityType === type && <div className="w-3 h-3 rounded-full bg-sky-500 shadow-sm" />}
+                                                    {profile.entityType === type && <div className="w-3 h-3 rounded-full bg-amber-500 shadow-sm" />}
                                                 </div>
                                             </button>
                                         ))}
@@ -171,7 +171,7 @@ export default function OnboardingForm() {
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-base font-bold">{age}</span>
-                                                    {profile.age === age && <div className="w-3 h-3 rounded-full bg-sky-500 shadow-sm" />}
+                                                    {profile.age === age && <div className="w-3 h-3 rounded-full bg-amber-500 shadow-sm" />}
                                                 </div>
                                             </button>
                                         ))}
@@ -231,7 +231,7 @@ export default function OnboardingForm() {
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-base font-bold">{period}</span>
-                                                    {profile.businessPeriod === period && <div className="w-3 h-3 rounded-full bg-sky-500 shadow-sm" />}
+                                                    {profile.businessPeriod === period && <div className="w-3 h-3 rounded-full bg-amber-500 shadow-sm" />}
                                                 </div>
                                             </button>
                                         ))}
@@ -254,7 +254,7 @@ export default function OnboardingForm() {
                                 onClick={handleNext}
                                 disabled={!isStepValid()}
                                 className={`flex-1 px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${isStepValid()
-                                    ? 'bg-gradient-to-r from-sky-300 via-cyan-300 to-indigo-300 text-slate-900 btn-gradient shadow-lg hover:shadow-xl'
+                                    ? 'bg-amber-500 text-slate-900 shadow-lg hover:bg-amber-400 hover:shadow-xl'
                                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                     }`}
                             >

@@ -4,15 +4,15 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 import type { PolicyFundDB } from '@/lib/supabase/client'
 import type { Policy, PolicyDocument, PolicyRoadmapStep } from '@/lib/mockPolicies'
 export const runtime = 'edge'
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const revalidate = 7200
 
-const NO_CACHE_HEADERS: Record<string, string> = {
-    'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate',
-    Pragma: 'no-cache',
-    'CDN-Cache-Control': 'no-store',
-    'Surrogate-Control': 'no-store',
+const CACHE_HEADERS: Record<string, string> = {
+    'Cache-Control': 'public, s-maxage=7200, stale-while-revalidate=3600',
+    'CDN-Cache-Control': 'public, max-age=7200',
 }
+
+const RESPONSE_CACHE_TTL_MS = 2 * 60 * 60 * 1000
+let responseCacheEntry: { data: string; headers: Record<string, string>; fetchedAt: number } | null = null
 
 function cleanKStartupSearchTerm(title?: string): string {
     if (!title) return ''
@@ -431,13 +431,28 @@ const DOCUMENT_SECTION_PATTERN = new RegExp(
     'i'
 )
 
+const SECTION_TITLE_PATTERN = /(?:\uC81C\uCD9C|\uC2E0\uCCAD|\uAD6C\uBE44|\uD544\uC218|\uD544\uC694|\uC99D\uBE59)\s*\uC11C\uB958/
+const KOREAN_MARKER_REGEX = /^[가-힣][\.)]\s/
+
+function cleanListItemLine(line: string): string {
+    return line
+        .replace(/^(?:\d+[\.)]|[-•·*])\s*/, '')
+        .replace(KOREAN_MARKER_REGEX, '')
+        .trim()
+}
+
+function isSectionTitleLine(line: string): boolean {
+    return SECTION_TITLE_PATTERN.test(line) && !/\d+\s*\uBD80/.test(line)
+}
+
 function extractListItems(sectionHtml: string): string[] {
     const items: string[] = []
     const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi
     let match: RegExpExecArray | null
     while ((match = liRegex.exec(sectionHtml)) !== null) {
-        const item = stripHtml(match[1])
-        if (item) items.push(item)
+        const raw = stripHtml(match[1])
+        const cleaned = cleanListItemLine(raw)
+        if (cleaned && !isSectionTitleLine(cleaned)) items.push(cleaned)
         if (items.length >= 12) break
     }
     if (items.length > 0) return items
@@ -446,8 +461,8 @@ function extractListItems(sectionHtml: string): string[] {
     if (!text) return []
     return text
         .split(/[\n\r\u2022\u00B7\-\*]+/g)
-        .map((line) => line.trim())
-        .filter(Boolean)
+        .map((line) => cleanListItemLine(line))
+        .filter((line) => line && !isSectionTitleLine(line))
         .slice(0, 12)
 }
 
@@ -480,7 +495,9 @@ function extractSectionItems(raw: string | null | undefined, pattern: RegExp): s
     const tail = text.slice(idx)
     const lines = tail.split(/\n+/).map((line) => line.trim()).filter(Boolean)
     if (lines.length <= 1) return []
-    const items = lines.slice(1).filter((line) => !pattern.test(line))
+    const items = lines.slice(1)
+        .map((line) => cleanListItemLine(line))
+        .filter((line) => line && !pattern.test(line) && !isSectionTitleLine(line))
     return items.slice(0, 12)
 }
 
@@ -563,59 +580,118 @@ function formatDateKst(date: Date): string {
     return `${year}.${month}.${day}`
 }
 
+const RANGE_SEPARATOR = /(?:~|\uFF5E|\u301C|\u223C|\u2212|-|\u2013|\u2014|\uBD80\uD130)/
+const RANGE_REGEXES: RegExp[] = [
+    new RegExp(`(\\d{4}[^~～〜∼]{0,40}\\d{1,2}[^~～〜∼]{0,40}\\d{1,2}[^~～〜∼]{0,20})\\s*${RANGE_SEPARATOR.source}\\s*(\\d{4}[^~～〜∼]{0,40}\\d{1,2}[^~～〜∼]{0,40}\\d{1,2}[^~～〜∼]{0,20})`, 'g'),
+    new RegExp(`(\\d{4}[^~～〜∼]{0,40}\\d{1,2}[^~～〜∼]{0,40}\\d{1,2}[^~～〜∼]{0,20})\\s*${RANGE_SEPARATOR.source}\\s*(\\d{1,2}[^~～〜∼]{0,10}\\d{1,2}[^~～〜∼]{0,10})`, 'g'),
+]
+
+function findDateRangeInText(source: string): { start: Date; end: Date } | null {
+    for (const regex of RANGE_REGEXES) {
+        regex.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = regex.exec(source)) !== null) {
+            const startText = match[1]
+            let endText = match[2]
+            const startDates = extractDatesFromText(startText)
+            if (startDates.length === 0) continue
+            const start = startDates[0]
+            if (!/20\d{2}/.test(endText)) {
+                const startYear = formatDateKst(start).slice(0, 4)
+                endText = `${startYear} ${endText}`
+            }
+            const endDates = extractDatesFromText(endText)
+            if (endDates.length === 0) continue
+            const end = endDates[0]
+            const spanDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+            if (spanDays < 0 || spanDays > 370) continue
+            return { start, end }
+        }
+    }
+    return null
+}
+
+function findDeadlineDateInText(source: string): Date | null {
+    const deadlinePatterns = [
+        /(?:\uB9C8\uAC10\uC77C?|\uC811\uC218\s*\uB9C8\uAC10|\uC2E0\uCCAD\s*\uB9C8\uAC10)\s*[:：]?\s*(\d{4}\s*[.\-/\uB144]\s*\d{1,2}\s*[.\-/\uC6D4]\s*\d{1,2}\s*\uC77C?)/g,
+        /(\d{4}\s*[.\-/\uB144]\s*\d{1,2}\s*[.\-/\uC6D4]\s*\d{1,2}\s*\uC77C?)\s*(?:\uAE4C\uC9C0|\uB9C8\uAC10)/g,
+    ]
+    for (const pattern of deadlinePatterns) {
+        pattern.lastIndex = 0
+        const match = pattern.exec(source)
+        if (match?.[1]) {
+            const dates = extractDatesFromText(match[1])
+            if (dates.length > 0) return dates[0]
+        }
+    }
+    return null
+}
+
+const APPLICATION_LABEL_HINTS = /(신청|접수|모집|공고|공모|지원|사업\s*공고)\s*(?:기간|일정|마감)[^0-9]{0,20}(.{0,200})/g
+
 function extractDateRangeFromText(text: string): { start: Date; end: Date } | null {
     const normalized = text.replace(/\s+/g, ' ')
-    const labelHints = /(\uC2E0\uCCAD|\uC811\uC218|\uBAA8\uC9D1|\uACF5\uACE0)\s*\uAE30\uAC04[^0-9]{0,10}(.{0,120})/g
-    const rangeRegexes: RegExp[] = [
-        /(\d{4}[^~]{0,40}\d{1,2}[^~]{0,40}\d{1,2}[^~]{0,20})\s*(?:~|\uFF5E|\u2212|-|\u2014|\uBD80\uD130)\s*(\d{4}[^~]{0,40}\d{1,2}[^~]{0,40}\d{1,2}[^~]{0,20})/g,
-        /(\d{4}[^~]{0,40}\d{1,2}[^~]{0,40}\d{1,2}[^~]{0,20})\s*(?:~|\uFF5E|\u2212|-|\u2014|\uBD80\uD130)\s*(\d{1,2}[^~]{0,10}\d{1,2}[^~]{0,10})/g,
-    ]
-
-    const findRange = (source: string): { start: Date; end: Date } | null => {
-        for (const regex of rangeRegexes) {
-            regex.lastIndex = 0
-            let match: RegExpExecArray | null
-            while ((match = regex.exec(source)) !== null) {
-                const startText = match[1]
-                let endText = match[2]
-                const startDates = extractDatesFromText(startText)
-                if (startDates.length === 0) continue
-                const start = startDates[0]
-                if (!/20\d{2}/.test(endText)) {
-                    const startYear = formatDateKst(start).slice(0, 4)
-                    endText = `${startYear} ${endText}`
-                }
-                const endDates = extractDatesFromText(endText)
-                if (endDates.length === 0) continue
-                const end = endDates[0]
-                const spanDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-                // Skip multi-year project ranges often labeled as "사업기간" rather than application periods.
-                if (spanDays < 0 || spanDays > 370) continue
-                return { start, end }
-            }
-        }
-        return null
-    }
 
     let labelMatch: RegExpExecArray | null
-    while ((labelMatch = labelHints.exec(normalized)) !== null) {
+    const labelRegex = new RegExp(APPLICATION_LABEL_HINTS.source, 'g')
+    while ((labelMatch = labelRegex.exec(normalized)) !== null) {
         const segment = labelMatch[0]
-        const range = findRange(segment)
+        const range = findDateRangeInText(segment)
         if (range) return range
     }
 
-    return findRange(normalized)
+    return findDateRangeInText(normalized)
 }
 
-function computeApplicationPeriod(applicationPeriod?: string | null, contentSummary?: string | null, rawContent?: string | null): string | null {
-    const combined = [applicationPeriod, contentSummary, rawContent].filter(Boolean).join(' ')
-    const text = stripHtml(combined)
-    if (!text) return null
-    const range = extractDateRangeFromText(text)
-    if (range) {
-        return `${formatDateKst(range.start)} ~ ${formatDateKst(range.end)}`
+function extractDateRangeFromLabeledSection(text: string): { start: Date; end: Date } | null {
+    const normalized = text.replace(/\s+/g, ' ')
+    const labelRegex = new RegExp(APPLICATION_LABEL_HINTS.source, 'g')
+    let labelMatch: RegExpExecArray | null
+    while ((labelMatch = labelRegex.exec(normalized)) !== null) {
+        const segment = labelMatch[0]
+        const range = findDateRangeInText(segment)
+        if (range) return range
     }
-    if (/(\uC0C1\uC2DC|\uC218\uC2DC|\uC608\uC0B0\s*\uC18C\uC9C4|\uC608\uC0B0\uC18C\uC9C4)/.test(text)) return '\uC0C1\uC2DC'
+    return null
+}
+
+const ALWAYS_OPEN_PATTERN = /(\uC0C1\uC2DC|\uC218\uC2DC|\uC608\uC0B0\s*\uC18C\uC9C4)/
+const formatDateRange = (r: { start: Date; end: Date }) => `${formatDateKst(r.start)} ~ ${formatDateKst(r.end)}`
+
+interface PreStrippedTexts {
+    apText: string
+    csText: string
+    rcText: string
+}
+
+function preStripTexts(applicationPeriod?: string | null, contentSummary?: string | null, rawContent?: string | null): PreStrippedTexts {
+    return {
+        apText: applicationPeriod ? stripHtml(applicationPeriod) : '',
+        csText: contentSummary ? stripHtml(contentSummary) : '',
+        rcText: rawContent ? stripHtml(rawContent) : '',
+    }
+}
+
+function computeApplicationPeriod(texts: PreStrippedTexts): string | null {
+    const { apText, csText, rcText } = texts
+
+    if (apText) {
+        if (ALWAYS_OPEN_PATTERN.test(apText)) return '\uC0C1\uC2DC'
+        const range = extractDateRangeFromText(apText)
+        if (range) return formatDateRange(range)
+    }
+    if (csText) {
+        if (ALWAYS_OPEN_PATTERN.test(csText)) return '\uC0C1\uC2DC'
+        const range = extractDateRangeFromText(csText)
+        if (range) return formatDateRange(range)
+    }
+    if (rcText) {
+        const range = extractDateRangeFromLabeledSection(rcText)
+        if (range) return formatDateRange(range)
+        const deadline = findDeadlineDateInText(rcText)
+        if (deadline) return `~ ${formatDateKst(deadline)}`
+        if (ALWAYS_OPEN_PATTERN.test(rcText)) return '\uC0C1\uC2DC'
+    }
     return null
 }
 
@@ -623,9 +699,11 @@ function normalizeApplicationPeriodText(value?: string | null): string | null {
     if (!value) return null
     const text = stripHtml(value)
     if (!text) return null
+    if (ALWAYS_OPEN_PATTERN.test(text)) return '\uC0C1\uC2DC'
     const range = extractDateRangeFromText(text)
-    if (range) return `${formatDateKst(range.start)} ~ ${formatDateKst(range.end)}`
-    if (/(\uC0C1\uC2DC|\uC218\uC2DC|\uC608\uC0B0\s*\uC18C\uC9C4|\uC608\uC0B0\uC18C\uC9C4)/.test(text)) return '\uC0C1\uC2DC'
+    if (range) return formatDateRange(range)
+    const deadline = findDeadlineDateInText(text)
+    if (deadline) return `~ ${formatDateKst(deadline)}`
     return null
 }
 
@@ -633,24 +711,36 @@ function computeDDayFromNormalizedPeriod(period?: string | null): number | null 
     if (!period) return null
     const text = stripHtml(period)
     if (!text) return null
-    if (/(\uC0C1\uC2DC|\uC218\uC2DC|\uC608\uC0B0\s*\uC18C\uC9C4|\uC608\uC0B0\uC18C\uC9C4)/.test(text)) return null
+    if (ALWAYS_OPEN_PATTERN.test(text)) return null
+    const calcDiff = (d: Date) => Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     const range = extractDateRangeFromText(text)
-    if (!range) return null
-    const diff = range.end.getTime() - Date.now()
-    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+    if (range) return calcDiff(range.end)
+    const deadlineMatch = text.match(/~\s*(\d{4}\.\d{2}\.\d{2})/)
+    if (deadlineMatch?.[1]) {
+        const dates = extractDatesFromText(deadlineMatch[1])
+        if (dates.length > 0) return calcDiff(dates[0])
+    }
+    return null
 }
 
-function computeDDay(applicationPeriod?: string | null, contentSummary?: string | null, rawContent?: string | null): number | null {
-    const combined = [applicationPeriod, contentSummary, rawContent].filter(Boolean).join(' ')
-    const text = stripHtml(combined)
-    if (!text) return null
+function computeDDay(texts: PreStrippedTexts): number | null {
+    const { apText, csText, rcText } = texts
+    const calcDiff = (d: Date) => Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
 
-    const range = extractDateRangeFromText(text)
-    if (range) {
-        const diff = range.end.getTime() - Date.now()
-        return Math.ceil(diff / (1000 * 60 * 60 * 24))
+    if (apText) {
+        const range = extractDateRangeFromText(apText)
+        if (range) return calcDiff(range.end)
     }
-
+    if (csText) {
+        const range = extractDateRangeFromText(csText)
+        if (range) return calcDiff(range.end)
+    }
+    if (rcText) {
+        const range = extractDateRangeFromLabeledSection(rcText)
+        if (range) return calcDiff(range.end)
+        const deadline = findDeadlineDateInText(rcText)
+        if (deadline) return calcDiff(deadline)
+    }
     return null
 }
 
@@ -658,7 +748,13 @@ function isMeaningfulApplicationPeriod(value?: string | null): boolean {
     return normalizeApplicationPeriodText(value) !== null
 }
 
-const metaCache = new Map<string, { dDay: number | null; applicationPeriod: string | null; roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] }>()
+const META_CACHE_TTL_MS = 2 * 60 * 60 * 1000
+
+interface MetaCacheEntry extends FetchMetaResult {
+    fetchedAt: number
+}
+
+const metaCache = new Map<string, MetaCacheEntry>()
 
 function shouldFetchDday(url?: string): boolean {
     if (!url) return false
@@ -674,15 +770,21 @@ function shouldFetchDday(url?: string): boolean {
     )
 }
 
+interface FetchMetaResult {
+    dDay: number | null
+    applicationPeriod: string | null
+    roadmap: PolicyRoadmapStep[]
+    documents: PolicyDocument[]
+    resolvedUrl?: string
+}
+
 async function fetchMetaFromUrl(
     url: string,
     policyTitle?: string
-): Promise<{ dDay: number | null; applicationPeriod: string | null; roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] } | null> {
+): Promise<FetchMetaResult | null> {
     const cached = metaCache.get(url)
-    if (cached) {
-        const isKStartupCache = url.toLowerCase().includes('k-startup.go.kr')
-        const needsRefresh = isKStartupCache && cached.roadmap.length === 0 && cached.documents.length === 0
-        if (!needsRefresh) return cached
+    if (cached && (Date.now() - cached.fetchedAt) < META_CACHE_TTL_MS) {
+        return cached
     }
     try {
         const controller = new AbortController()
@@ -723,14 +825,9 @@ async function fetchMetaFromUrl(
         }
 
         const text = stripHtml(effectiveHtml)
-        const applicationPeriod = computeApplicationPeriod(text, text, text)
-        const dates = extractDatesFromText(text)
-        let dDay: number | null = null
-        if (dates.length > 0) {
-            const latest = dates.reduce((acc, cur) => (cur > acc ? cur : acc), dates[0])
-            const diff = latest.getTime() - Date.now()
-            dDay = Math.ceil(diff / (1000 * 60 * 60 * 24))
-        }
+        const fetchedTexts: PreStrippedTexts = { apText: text, csText: '', rcText: text }
+        const applicationPeriod = computeApplicationPeriod(fetchedTexts)
+        const dDay = computeDDay(fetchedTexts)
         const roadmapTitles = extractSectionItems(effectiveHtml, ROADMAP_SECTION_PATTERN)
         const documentNames = extractSectionItems(effectiveHtml, DOCUMENT_SECTION_PATTERN)
         let roadmap: PolicyRoadmapStep[] = roadmapTitles.map((title, index) => ({
@@ -762,11 +859,12 @@ async function fetchMetaFromUrl(
                 description: '',
             }))
         }
-        if (isKStartup && (documents.length === 0 || roadmap.length === 0) && policyTitle) {
+        if (isKStartup && (documents.length === 0 || roadmap.length === 0 || effectiveUrl === url) && policyTitle) {
             const resolved = await fetchKStartupMetaByTitle(policyTitle)
             if (resolved) {
                 if (documents.length === 0 && resolved.documents.length > 0) documents = resolved.documents
                 if (roadmap.length === 0 && resolved.roadmap.length > 0) roadmap = resolved.roadmap
+                if (resolved.resolvedUrl && effectiveUrl === url) effectiveUrl = resolved.resolvedUrl
             }
         }
         if ((roadmap.length === 0 || documents.length === 0) && isBizinfo) {
@@ -787,8 +885,10 @@ async function fetchMetaFromUrl(
                 if (roadmap.length > 0 && documents.length > 0) break
             }
         }
-        const result = { dDay, applicationPeriod, roadmap, documents }
-        metaCache.set(url, result)
+        const resolvedUrl = effectiveUrl !== url ? effectiveUrl : undefined
+        const result: FetchMetaResult = { dDay, applicationPeriod, roadmap, documents, resolvedUrl }
+        const cacheEntry: MetaCacheEntry = { ...result, fetchedAt: Date.now() }
+        metaCache.set(url, cacheEntry)
         return result
     } catch {
         return null
@@ -840,7 +940,7 @@ function extractKStartupSectionItems(html: string, sectionTitle: string): string
     return items.map((item) => item.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 12)
 }
 
-async function fetchKStartupMetaByTitle(title: string): Promise<{ roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[] } | null> {
+async function fetchKStartupMetaByTitle(title: string): Promise<{ roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[]; resolvedUrl?: string } | null> {
     const searchTerms = buildKStartupSearchCandidates(title)
     if (searchTerms.length === 0) return null
     try {
@@ -896,7 +996,7 @@ async function fetchKStartupMetaByTitle(title: string): Promise<{ roadmap: Polic
                 description: '',
             }))
         }
-        return { roadmap, documents }
+        return { roadmap, documents, resolvedUrl: detailUrl || undefined }
     } catch {
         return null
     }
@@ -1386,9 +1486,10 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     const cleanedTitle = sanitizePolicyTitle(extractTitleFromHtml(dbPolicy.title) || stripHtml(dbPolicy.title))
     const cleanedSummary = cleanSummaryText(dbPolicy.content_summary || '')
     const summaryFallback = isGenericSummary(cleanedSummary) ? extractSummaryFromContent(dbPolicy.raw_content, cleanedTitle) : cleanedSummary
-    const cleanedPeriod = stripHtml(dbPolicy.application_period)
-    const computedPeriod = computeApplicationPeriod(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
-    const computedDDayRaw = computeDDay(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
+    const texts = preStripTexts(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
+    const cleanedPeriod = texts.apText
+    const computedPeriod = computeApplicationPeriod(texts)
+    const computedDDayRaw = computeDDay(texts)
     const computedDDay = Number.isFinite(computedDDayRaw) ? computedDDayRaw : null
     const finalPeriod = normalizeApplicationPeriodText(computedPeriod) || normalizeApplicationPeriodText(cleanedPeriod) || '\uC0C1\uC2DC'
     const syncedDDay = computeDDayFromNormalizedPeriod(finalPeriod)
@@ -1440,25 +1541,32 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
 }
 
 export async function GET() {
+    if (responseCacheEntry && (Date.now() - responseCacheEntry.fetchedAt) < RESPONSE_CACHE_TTL_MS) {
+        return new Response(responseCacheEntry.data, {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...responseCacheEntry.headers },
+        })
+    }
+
     try {
         const supabase = getSupabaseClient()
         if (!supabase) {
             return NextResponse.json(
                 { success: false, error: 'Missing Supabase environment variables', data: [] },
-                { status: 500, headers: NO_CACHE_HEADERS }
+                { status: 500, headers: CACHE_HEADERS }
             )
         }
         // Supabase에서 모든 정책 데이터 가져오기
         const { data, error } = await supabase
             .from('policy_funds')
-            .select('*')
+            .select('id,title,link,source_site,content_summary,region,biz_age,industry,amount,raw_content,agency,application_period,d_day,url,mobile_url,inquiry,application_method,roadmap,documents,criteria,created_at')
             .order('created_at', { ascending: false })
 
         if (error) {
             console.error('Supabase error:', error)
             return NextResponse.json(
                 { success: false, error: 'Failed to fetch policies from database', data: [] },
-                { status: 500, headers: NO_CACHE_HEADERS }
+                { status: 500, headers: CACHE_HEADERS }
             )
         }
 
@@ -1487,31 +1595,23 @@ export async function GET() {
         const filtered = (data as PolicyFundDB[]).filter((p) => !isTestPolicy(p) && !isInvalidKStartup(p))
 
         // DB 데이터를 UI 타입으로 변환 + D-Day 보정
-        const policies: Policy[] = await mapWithLimit(filtered, 12, async (p) => {
+        const policies: Policy[] = await mapWithLimit(filtered, 5, async (p) => {
             const mapped = mapDBToUI(p)
-            if (mapped.url) {
-                const resolved = await resolveKStartupDetailUrl(
-                    p.link || p.url || mapped.url,
-                    mapped.title,
-                    p.source_site
-                )
-                if (resolved) mapped.url = resolved
-            }
-            const needsDday = mapped.dDay === 999 || mapped.dDay === null
-            const needsPeriod = !isMeaningfulApplicationPeriod(mapped.applicationPeriod)
-            const needsRoadmap = mapped.roadmap.length === 0
-            const needsDocuments = mapped.documents.length === 0
-            if ((needsDday || needsPeriod || needsRoadmap || needsDocuments) && shouldFetchDday(mapped.url)) {
+            const needsData =
+                mapped.roadmap.length === 0 &&
+                mapped.documents.length === 0 &&
+                (mapped.dDay === 999 || mapped.dDay == null)
+            const hasSearchUrl = mapped.url?.includes('schM=list&schStr=')
+            if ((needsData || hasSearchUrl) && mapped.url && shouldFetchDday(mapped.url)) {
                 const fetched = await fetchMetaFromUrl(mapped.url as string, mapped.title)
                 if (fetched) {
-                    if (needsDday && fetched.dDay !== null) mapped.dDay = fetched.dDay
-                    if (needsPeriod && fetched.applicationPeriod) mapped.applicationPeriod = fetched.applicationPeriod
-                    const syncedDdayFromPeriod = computeDDayFromNormalizedPeriod(mapped.applicationPeriod)
-                    if (syncedDdayFromPeriod !== null) mapped.dDay = syncedDdayFromPeriod
-                    if (needsRoadmap && fetched.roadmap.length > 0) {
-                        mapped.roadmap = expandCommaSeparatedRoadmap(fetched.roadmap).slice(0, 12)
-                    }
-                    if (needsDocuments && fetched.documents.length > 0) mapped.documents = fetched.documents.slice(0, 12)
+                    if (fetched.resolvedUrl) mapped.url = fetched.resolvedUrl
+                    if (fetched.dDay !== null) mapped.dDay = fetched.dDay
+                    if (fetched.applicationPeriod) mapped.applicationPeriod = fetched.applicationPeriod
+                    const syncedDday = computeDDayFromNormalizedPeriod(mapped.applicationPeriod)
+                    if (syncedDday !== null) mapped.dDay = syncedDday
+                    if (fetched.roadmap.length > 0) mapped.roadmap = expandCommaSeparatedRoadmap(fetched.roadmap).slice(0, 12)
+                    if (fetched.documents.length > 0) mapped.documents = fetched.documents.slice(0, 12)
                 }
             }
             return mapped
@@ -1563,23 +1663,25 @@ export async function GET() {
             return true
         })
 
-        console.log(`? Fetched ${normalizedPolicies.length} policies, IDs:`, normalizedPolicies.map(p => p.id))
+        const responseBody = JSON.stringify({
+            success: true,
+            data: normalizedPolicies,
+            count: normalizedPolicies.length,
+            error: null,
+        })
 
-        return NextResponse.json(
-            {
-                success: true,
-                data: normalizedPolicies,
-                count: normalizedPolicies.length,
-                error: null,
-            },
-            { headers: NO_CACHE_HEADERS }
-        )
+        responseCacheEntry = { data: responseBody, headers: CACHE_HEADERS, fetchedAt: Date.now() }
+
+        return new Response(responseBody, {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...CACHE_HEADERS },
+        })
 
     } catch (error) {
         console.error('API error:', error)
         return NextResponse.json(
             { success: false, error: 'Internal server error', data: [] },
-            { status: 500, headers: NO_CACHE_HEADERS }
+            { status: 500, headers: CACHE_HEADERS }
         )
     }
 }

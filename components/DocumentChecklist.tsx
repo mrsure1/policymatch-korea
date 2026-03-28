@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { PolicyDocument } from '@/lib/mockPolicies';
@@ -7,9 +7,10 @@ import { ExternalLink, FileText, CheckCircle2, Circle } from 'lucide-react';
 
 interface DocumentChecklistProps {
     documents: PolicyDocument[];
+    policyUrl?: string;
 }
 
-export default function DocumentChecklist({ documents }: DocumentChecklistProps) {
+export default function DocumentChecklist({ documents, policyUrl }: DocumentChecklistProps) {
     const [checkedDocs, setCheckedDocs] = useState<Set<string>>(new Set());
 
     const toggleCheck = (docName: string) => {
@@ -109,15 +110,15 @@ export default function DocumentChecklist({ documents }: DocumentChecklistProps)
                             <FileText className="w-4 h-4" />
                             <span>{doc.whereToGet}</span>
                         </div>
-                        {doc.link && (
+                        {(doc.link || policyUrl) && (
                             <a
-                                href={doc.link}
+                                href={doc.link || policyUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                바로가기
+                                공고문 바로가기
                                 <ExternalLink className="w-3 h-3" />
                             </a>
                         )}

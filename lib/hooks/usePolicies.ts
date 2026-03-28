@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Policy, UserProfile } from '@/lib/mockPolicies';
 
 type ScoredPolicy = { policy: Policy; score: number; scoreRatio: number; isGeneric: boolean };
@@ -47,10 +47,9 @@ export function usePolicies(profile: UserProfile, options?: { skipFiltering?: bo
 
             try {
                 // 내 서버의 프록시 API 호출 (/api/policies)
-                const response = await fetch(`/api/policies?ts=${Date.now()}`, {
-                    cache: 'no-store',
-                    headers: { 'Cache-Control': 'no-cache' },
-                });
+                const response = await fetch('/api/policies', {
+                    next: { revalidate: 7200 },
+                } as RequestInit);
                 const result = await response.json();
 
                 if (result.success && result.data) {

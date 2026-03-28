@@ -3,10 +3,8 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useUserProfileStore } from '@/lib/store';
 import { usePolicies } from '@/lib/hooks/usePolicies';
-import RoadmapTimeline from '@/components/RoadmapTimeline';
-import DocumentChecklist from '@/components/DocumentChecklist';
-import { getDocumentCount, getRoadmapCount, getRoadmapSteps, getRequiredDocuments, getPolicySummary } from '@/lib/utils/policyCounts';
-import { ArrowLeft, Calendar, Building2, TrendingUp, MapPin, FileCheck, Loader2, ExternalLink, AlertTriangle, Info, Map } from 'lucide-react';
+import { getPolicySummary } from '@/lib/utils/policyCounts';
+import { ArrowLeft, TrendingUp, MapPin, FileCheck, Loader2, ExternalLink, AlertTriangle, Info } from 'lucide-react';
 export const runtime = 'edge'
 
 export default function PolicyDetailPage() {
@@ -191,7 +189,12 @@ export default function PolicyDetailPage() {
     const applicationPeriodForDisplay =
         policy.applicationPeriod && !/^(null|undefined|\s*)$/i.test(policy.applicationPeriod)
             ? policy.applicationPeriod
-            : periodFromDetail || '상시'
+            : periodFromDetail || '공고문 확인'
+    const isAlwaysOpen = /상시|수시|예산\s*소진/.test(applicationPeriodForDisplay);
+    const isUnknownDDay = policy.dDay === 999 || policy.dDay == null;
+    const isExpired = !isUnknownDDay && policy.dDay < 0;
+    const dDayLabel = isAlwaysOpen ? '상시모집' : isUnknownDDay ? null : isExpired ? '마감' : policy.dDay === 0 ? 'D-Day' : `D-${policy.dDay}`;
+    const dDayColor = isAlwaysOpen ? 'bg-green-100 text-green-700' : isExpired ? 'bg-slate-200 text-slate-500' : (policy.dDay <= 7 ? 'bg-red-100 text-red-600' : policy.dDay <= 30 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700');
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
@@ -218,8 +221,8 @@ export default function PolicyDetailPage() {
                                 {policy.agency}
                             </span>
                         )}
-                        {policy.dDay >= 0 && (
-                            <span className="bg-red-100 text-red-600 px-2 py-1 rounded text-xs font-bold">D-{policy.dDay}</span>
+                        {dDayLabel && (
+                            <span className={`${dDayColor} px-2 py-1 rounded text-xs font-bold`}>{dDayLabel}</span>
                         )}
                     </div>
                 </div>
@@ -425,21 +428,7 @@ export default function PolicyDetailPage() {
                     </div>
                 ) : null}
 
-                {/* 5. Action Roadmap */}
-                {getRoadmapCount(policy.roadmap, policy.detailContent) > 0 && (
-                    <div className="glass-card rounded-2xl p-6 text-slate-900">
-                        <RoadmapTimeline steps={getRoadmapSteps(policy.roadmap, policy.detailContent)} />
-                    </div>
-                )}
-
-                {/* 6. Required Documents */}
-                {getDocumentCount(policy.documents, policy.detailContent) > 0 && (
-                    <div className="glass-card rounded-2xl p-6 text-slate-900">
-                        <DocumentChecklist documents={getRequiredDocuments(policy.documents, policy.detailContent)} />
-                    </div>
-                )}
-
-                {/* ???? */}
+                {/* 주의사항 */}
                 <div className="flex items-start gap-3 bg-amber-50/90 border border-amber-200 p-4 rounded-2xl text-sm text-amber-900">
                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                     <div>
