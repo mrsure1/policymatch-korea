@@ -1,8 +1,13 @@
 'use client';
 
 import { Policy } from '@/lib/mockPolicies';
-import { Clock, TrendingUp, ExternalLink } from 'lucide-react';
+import { Clock, Banknote, ExternalLink, ChevronRight } from 'lucide-react';
 import { getPolicySummary } from '@/lib/utils/policyCounts';
+import { resolvePolicyCardHref } from '@/lib/utils/kstartupUrl';
+import {
+    formatApplicationPeriodDisplay,
+    normalizeSupportAmount,
+} from '@/lib/utils/policyDisplay';
 
 interface PolicyCardProps {
     policy: Policy;
@@ -10,25 +15,27 @@ interface PolicyCardProps {
 }
 
 export default function PolicyCard({ policy, variant = 'default' }: PolicyCardProps) {
-    const isAlwaysOpen = /상시|수시|예산\s*소진/.test(policy.applicationPeriod || '');
+    const applicationPeriod = formatApplicationPeriodDisplay(policy.applicationPeriod);
+    const supportAmount = normalizeSupportAmount(policy.supportAmount);
+    const isAlwaysOpen = /상시|수시|예산\s*소진|세부사업별\s*상이/.test(applicationPeriod);
     const isUnknownDDay = policy.dDay === 999 || policy.dDay == null;
     const isExpired = !isUnknownDDay && policy.dDay < 0;
 
     const getDDayLabel = () => {
-        if (isAlwaysOpen) return '상시모집';
+        if (/세부사업별\s*상이/.test(applicationPeriod)) return '세부별 상이';
+        if (isAlwaysOpen) return '상시';
         if (isUnknownDDay) return '기간확인';
         if (isExpired) return '마감';
         if (policy.dDay === 0) return 'D-Day';
         return `D-${policy.dDay}`;
     };
 
-    const getDDayColor = () => {
-        if (isAlwaysOpen) return 'bg-green-100 text-green-700';
-        if (isUnknownDDay) return 'bg-slate-100 text-slate-500';
-        if (isExpired) return 'bg-slate-200 text-slate-500';
-        if (policy.dDay <= 7) return 'bg-red-100 text-red-700';
-        if (policy.dDay <= 30) return 'bg-orange-100 text-orange-700';
-        return 'bg-blue-100 text-blue-700';
+    const getDDayBadgeClass = () => {
+        if (isAlwaysOpen) return 'badge-dday-open';
+        if (isUnknownDDay || isExpired) return 'badge-dday-muted';
+        if ((policy.dDay ?? 999) <= 7) return 'badge-dday-urgent';
+        if ((policy.dDay ?? 999) <= 30) return 'badge-dday-warn';
+        return 'badge-dday-normal';
     };
 
     const getSourceMeta = () => {
@@ -63,67 +70,71 @@ export default function PolicyCard({ policy, variant = 'default' }: PolicyCardPr
     const summaryText = getPolicySummary(policy.summary, policy.detailContent) || '공고문 요약을 준비 중입니다.';
     const showAgency = policy.agency && policy.agency !== '정부기관' && policy.agency !== source.label;
 
-    const variantClass =
+    const variantFrame =
         variant === 'matched'
-            ? 'glass-card-matched'
+            ? 'paper-card paper-card-accent'
             : variant === 'common'
-                ? 'glass-card-common'
-                : '';
+                ? 'paper-card-muted'
+                : 'paper-card';
 
-    // 원문 공고 사이트 URL (모바일 URL 우선, 없으면 일반 URL 사용)
-    const externalUrl = policy.mobileUrl || policy.url;
+    const { href: cardHref, openInNewTab } = resolvePolicyCardHref(policy);
+    const hasDirectExternalLink = openInNewTab && cardHref.startsWith('http');
 
     return (
         <a
-            href={externalUrl || `/policy/${policy.id}`}
-            target={externalUrl ? '_blank' : '_self'}
-            rel={externalUrl ? 'noopener noreferrer' : undefined}
-            className="h-full"
+            href={cardHref}
+            target={openInNewTab ? '_blank' : '_self'}
+            rel={openInNewTab ? 'noopener noreferrer' : undefined}
+            className="group block h-full no-underline"
         >
-            <div className={`glass-card ${variantClass} h-full min-h-[280px] rounded-xl border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 p-6 cursor-pointer text-slate-900 flex flex-col ${variant === 'matched' ? 'accent-l border-amber-500/20 hover:border-amber-400/40' : 'border-slate-200/60 hover:border-slate-300/60'}`}>
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                        <h3 className="text-lg font-bold text-slate-900 mb-1 line-clamp-2" style={{ fontFamily: 'var(--font-display)' }}>
-                            {policy.title}
-                        </h3>
-                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/80 mt-1">
-                            <img src={source.logo} alt={source.label} className="w-4 h-4" />
+            <div
+                className={`${variantFrame} policy-card-inner h-full cursor-pointer flex flex-col transition-shadow duration-150 hover:shadow-[var(--shadow)]`}
+            >
+                <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--surface-sunken)] text-[var(--ink-muted)] border border-[var(--line)]">
+                            <img src={source.logo} alt="" className="w-3.5 h-3.5" />
                             {source.label}
                         </span>
                         {showAgency && (
-                            <span className="inline-block px-2 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/60 mt-1 ml-2">
+                            <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--primary-soft)] text-[var(--primary)] border border-[rgba(30,64,175,0.15)]">
                                 {policy.agency}
                             </span>
                         )}
                     </div>
-                    <div className={`px-3 py-1 rounded-lg text-sm font-bold ${getDDayColor()}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold shrink-0 tabular-nums ${getDDayBadgeClass()}`}>
                         {getDDayLabel()}
-                    </div>
+                    </span>
                 </div>
 
-                {/* Summary */}
-                <p className="text-slate-600 text-sm mb-4 line-clamp-2 flex-1 leading-relaxed">
+                <h3 className="policy-card-title text-[var(--ink)] mb-2 line-clamp-2 leading-snug group-hover:text-[var(--primary)] transition-colors">
+                    {policy.title}
+                </h3>
+
+                <p className="text-[var(--ink-muted)] text-xs mb-4 line-clamp-2 flex-1 leading-relaxed">
                     {summaryText}
                 </p>
 
-                {/* Info */}
-                <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1 text-amber-700">
-                        <TrendingUp className="w-4 h-4" />
-                        <span className="font-bold">{policy.supportAmount || '미정'}</span>
+                <div className="flex items-center gap-4 text-xs text-[var(--ink-muted)] pt-3 border-t border-[var(--line)]">
+                    {supportAmount && (
+                        <div className="flex items-center gap-1">
+                            <Banknote className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0" />
+                            <span className="font-medium text-[var(--ink-secondary)]">
+                                {supportAmount}
+                            </span>
+                        </div>
+                    )}
+                    <div className="flex items-center gap-1 min-w-0">
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{applicationPeriod}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-slate-500">
-                        <Clock className="w-4 h-4" />
-                        <span>{policy.applicationPeriod || '공고문 확인'}</span>
-                    </div>
-                </div>
-
-                {/* CTA */}
-                <div className="mt-auto pt-4 border-t border-slate-200/60 flex items-center justify-end">
-                    <span className="text-sm text-slate-500 flex items-center gap-1">
-                        공고 원문 바로가기
-                        <ExternalLink className="w-4 h-4 text-amber-600" />
+                    <span className="ml-auto flex items-center gap-0.5 text-[var(--primary)] font-medium opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        {hasDirectExternalLink ? '원문' : '상세'}
+                        {hasDirectExternalLink ? (
+                            <ExternalLink className="w-3 h-3" />
+                        ) : (
+                            <ChevronRight className="w-3 h-3" />
+                        )}
                     </span>
                 </div>
             </div>

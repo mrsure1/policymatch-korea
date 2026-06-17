@@ -1,29 +1,56 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useUserProfileStore } from '@/lib/store';
 import { usePolicies } from '@/lib/hooks/usePolicies';
 import OnboardingForm from '@/components/OnboardingForm';
 import PolicyCard from '@/components/PolicyCard';
 import EditableTag from '@/components/EditableTag';
+import SiteShell from '@/components/SiteShell';
 import {
   RefreshCw,
-  User,
-  Info,
   Loader2,
   AlertCircle,
   ArrowRight,
-  Sparkles,
+  Building2,
   ShieldCheck,
+  Calendar,
+  Database,
+  Target,
   Layers,
-  BarChart3,
+  Star,
+  Check,
 } from 'lucide-react';
 
 export default function HomePage() {
-  const { profile, isOnboardingComplete, resetProfile, updateProfile } = useUserProfileStore();
-  const { policies: matchedPolicies, loading, error, source } = usePolicies(profile);
+  const {
+    profile,
+    savedProfile,
+    isOnboardingComplete,
+    hydrated,
+    resetProfile,
+    updateProfile,
+    saveProfileAsMine,
+    hydrateFromStorage,
+  } = useUserProfileStore();
+  const { policies: matchedPolicies, loading, error } = usePolicies(profile);
   const [openTagId, setOpenTagId] = useState<string | null>(null);
+
+  // 앱 로드 시 저장해 둔 "내 조건"을 불러와 바로 매칭 결과를 보여준다.
+  useEffect(() => {
+    hydrateFromStorage();
+  }, [hydrateFromStorage]);
+
+  // 현재 화면의 조건이 저장된 "내 조건"과 동일한지 여부
+  const isProfileSaved = useMemo(
+    () =>
+      savedProfile != null &&
+      (Object.keys(profile) as (keyof typeof profile)[]).every(
+        (key) => profile[key] === savedProfile[key]
+      ),
+    [profile, savedProfile]
+  );
 
   const { matchedList, commonList } = useMemo(() => {
     const genericTokens = ['전체', '전국', '제한없음', '무관'];
@@ -34,21 +61,33 @@ export default function HomePage() {
 
     const calcScore = (policy: any) => {
       const criteria = policy.criteria || {};
-      const regionScore = hasMeaningfulList(criteria.regions)
-        && criteria.regions.some((r: string) => profile.region.includes(r))
-        ? 1 : 0;
-      const industryScore = hasMeaningfulList(criteria.industries)
-        && criteria.industries.some((i: string) => profile.industry.includes(i) || i === '기타')
-        ? 1 : 0;
-      const ageScore = hasMeaningfulList(criteria.ageGroups)
-        && criteria.ageGroups.includes(profile.age as any)
-        ? 1 : 0;
-      const periodScore = hasMeaningfulList(criteria.businessPeriods)
-        && criteria.businessPeriods.includes(profile.businessPeriod as any)
-        ? 1 : 0;
-      const entityScore = hasMeaningfulList(criteria.entityTypes)
-        && criteria.entityTypes.includes(profile.entityType as any)
-        ? 1 : 0;
+      const regionScore =
+        hasMeaningfulList(criteria.regions) &&
+        criteria.regions.some((r: string) => profile.region.includes(r))
+          ? 1
+          : 0;
+      const industryScore =
+        hasMeaningfulList(criteria.industries) &&
+        criteria.industries.some(
+          (i: string) => profile.industry.includes(i) || i === '기타'
+        )
+          ? 1
+          : 0;
+      const ageScore =
+        hasMeaningfulList(criteria.ageGroups) &&
+        criteria.ageGroups.includes(profile.age as any)
+          ? 1
+          : 0;
+      const periodScore =
+        hasMeaningfulList(criteria.businessPeriods) &&
+        criteria.businessPeriods.includes(profile.businessPeriod as any)
+          ? 1
+          : 0;
+      const entityScore =
+        hasMeaningfulList(criteria.entityTypes) &&
+        criteria.entityTypes.includes(profile.entityType as any)
+          ? 1
+          : 0;
 
       const meaningfulCount =
         (hasMeaningfulList(criteria.regions) ? 1 : 0) +
@@ -77,80 +116,87 @@ export default function HomePage() {
     return { matchedList: matched, commonList: common };
   }, [matchedPolicies, profile]);
 
+  // 저장된 조건을 불러오기 전에는 온보딩이 잠깐 깜빡이지 않도록 대기한다.
+  if (!hydrated) {
+    return (
+      <SiteShell centered>
+        <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
+      </SiteShell>
+    );
+  }
+
   if (!isOnboardingComplete) {
     return <OnboardingForm />;
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-[url('/bg-mesh.svg')] bg-cover opacity-70" />
-      <div className="pointer-events-none absolute inset-0 bg-[url('/texture-grid.svg')] bg-cover opacity-50 mix-blend-soft-light" />
-
-      {/* Header */}
-      <header className="sticky top-0 z-20 glass-dark">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-lg">
-              <Info className="w-5 h-5 text-white" />
+    <SiteShell>
+      <header className="site-header">
+        <div className="site-container site-header-inner">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="site-logo">
+              <Building2 className="w-4 h-4 lg:w-5 lg:h-5" strokeWidth={2} />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-100">정책자금 매칭</h1>
-              <p className="text-xs text-slate-300">나에게 딱 맞는 정부 지원 정책</p>
+            <div className="min-w-0">
+              <h1 className="text-base lg:text-lg font-bold text-[var(--ink)] truncate leading-tight">
+                PolicyMatch Korea
+              </h1>
+              <p className="text-[11px] lg:text-xs text-[var(--ink-muted)] leading-none mt-0.5">
+                정부 정책자금 매칭
+              </p>
             </div>
           </div>
-          <button
-            onClick={resetProfile}
-            className="flex items-center gap-2 px-4 py-2 rounded-full border border-sky-200/70 bg-sky-300 text-slate-900 font-semibold shadow-sm hover:bg-sky-200 transition-colors"
-          >
+          <button type="button" onClick={resetProfile} className="btn-ghost shrink-0">
             <RefreshCw className="w-4 h-4" />
-            <span className="text-sm font-semibold">다시 시작</span>
+            <span className="hidden sm:inline">프로필 재설정</span>
           </button>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-4 pt-5 pb-3 relative z-10">
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/70 border border-slate-700/40 text-xs font-semibold text-slate-200">
-            <Sparkles className="w-4 h-4 text-sky-300" />
-            2026 공고 반영 완료
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-bold leading-tight text-white">
-            프로필과 정확히 맞는
-            <span className="text-sky-300"> 정책 지원금</span>
-          </h2>
-          <p className="text-slate-200/80 text-base sm:text-lg max-w-xl">
-            흩어진 정책을 한곳에서 조회하고, 지금 필요한 지원금만
-            선별해 드립니다. 신청 기간과 필수 서류까지
-            한 번에 확인하세요.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <div className="glass-dark px-4 py-2 rounded-full text-sm font-semibold text-slate-100 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-300" />
-              신청 일정 검증
+      <section className="border-b border-[var(--line)] bg-[var(--surface-raised)]">
+        <div className="site-container py-8 sm:py-10 lg:py-12 animate-reveal">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 lg:gap-10">
+            <div className="space-y-4 lg:max-w-3xl">
+              <div className="badge-live">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
+                2026년 공고 데이터 연동
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-[2.75rem] font-bold text-[var(--ink)] leading-tight">
+                프로필 기반{' '}
+                <span className="text-[var(--primary)]">정책자금 매칭</span>
+              </h2>
+              <p className="text-[var(--ink-muted)] text-sm sm:text-base lg:text-lg leading-relaxed">
+                기업 조건에 맞는 지원사업을 선별하고, 신청 기간·필수 서류를 한 화면에서 확인할 수
+                있습니다.
+              </p>
             </div>
-            <div className="glass-dark px-4 py-2 rounded-full text-sm font-semibold text-slate-100 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-indigo-300" />
-              지원 분야 연동
-            </div>
-            <div className="glass-dark px-4 py-2 rounded-full text-sm font-semibold text-slate-100 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-sky-300" />
-              매칭 데이터 분석
+            <div className="stat-card-grid lg:shrink-0">
+              <div className="stat-card">
+                <p className="stat-card-label">매칭 공고</p>
+                <p className="stat-card-value tabular-nums text-[var(--primary)]">
+                  {loading ? '—' : matchedList.length}
+                </p>
+              </div>
+              <div className="stat-card">
+                <p className="stat-card-label">공통 공고</p>
+                <p className="stat-card-value tabular-nums">{loading ? '—' : commonList.length}</p>
+              </div>
+              <div className="stat-card">
+                <p className="stat-card-label">전체</p>
+                <p className="stat-card-value tabular-nums">{loading ? '—' : matchedPolicies.length}</p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* User Profile Summary */}
-      <div className="max-w-6xl mx-auto px-4 py-6 relative z-10">
-        <div className="glass-card rounded-2xl p-6 mb-6 text-slate-900">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center flex-shrink-0 shadow-lg">
-              <User className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-slate-900 mb-2">내 프로필</h2>
-              <p className="text-xs text-slate-500 mb-3">클릭하여 조건을 변경하면 즉시 매칭 결과가 업데이트됩니다</p>
+      <div className="site-container py-8 lg:py-10">
+        <div className="paper-card p-5 sm:p-6 lg:p-8 mb-6 lg:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 lg:gap-6">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm lg:text-base font-semibold text-[var(--ink-muted)] uppercase tracking-wide mb-3 lg:mb-4">
+                매칭 프로필
+              </h2>
               <div className="flex flex-wrap gap-2">
                 {profile.entityType && (
                   <EditableTag
@@ -161,10 +207,9 @@ export default function HomePage() {
                     value={profile.entityType}
                     options={['예비창업자', '소상공인', '중소기업']}
                     onChange={(value) => updateProfile({ entityType: value as any })}
-                    color="blue"
+                    color="seal"
                   />
                 )}
-                {/* ... other tags unchanged ... */}
                 {profile.age && (
                   <EditableTag
                     id="age"
@@ -183,7 +228,10 @@ export default function HomePage() {
                     setOpenId={setOpenTagId}
                     label=""
                     value={profile.region}
-                    options={['서울', '경기', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주']}
+                    options={[
+                      '서울', '경기', '인천', '부산', '대구', '광주', '대전', '울산', '세종',
+                      '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주',
+                    ]}
                     onChange={(value) => updateProfile({ region: value })}
                   />
                 )}
@@ -194,7 +242,10 @@ export default function HomePage() {
                     setOpenId={setOpenTagId}
                     label=""
                     value={profile.industry}
-                    options={['IT/소프트웨어', '제조업', '서비스업', '도소매업', '음식/숙박업', '건설업', '교육서비스업', '기타']}
+                    options={[
+                      'IT/소프트웨어', '제조업', '서비스업', '도소매업',
+                      '음식/숙박업', '건설업', '교육서비스업', '기타',
+                    ]}
                     onChange={(value) => updateProfile({ industry: value })}
                   />
                 )}
@@ -210,116 +261,154 @@ export default function HomePage() {
                   />
                 )}
               </div>
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <p className="text-xs lg:text-sm text-[var(--ink-muted)]">
+                  태그를 클릭하면 조건을 변경할 수 있으며, 결과가 즉시 반영됩니다.
+                </p>
+                <button
+                  type="button"
+                  onClick={saveProfileAsMine}
+                  disabled={isProfileSaved}
+                  className={`shrink-0 self-start sm:self-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    isProfileSaved
+                      ? 'border-[var(--success)] text-[var(--success)] cursor-default'
+                      : 'border-[var(--line)] text-[var(--ink)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
+                  }`}
+                >
+                  {isProfileSaved ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      내 조건으로 저장됨
+                    </>
+                  ) : (
+                    <>
+                      <Star className="w-3.5 h-3.5" />
+                      내 조건으로 저장
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end shrink-0">
+              <span className="feature-item">
+                <span className="feature-item-icon">
+                  <ShieldCheck className="w-3 h-3" />
+                </span>
+                공공데이터 기반
+              </span>
+              <span className="feature-item">
+                <span className="feature-item-icon">
+                  <Calendar className="w-3 h-3" />
+                </span>
+                신청기간 검증
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Status/Error Messages */}
         {error && (
-          <div className="mb-6 p-4 rounded-2xl border border-red-200/80 bg-red-50/90 flex items-start gap-3 text-slate-900">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="mb-6 p-4 rounded-lg border border-[rgba(220,38,38,0.25)] bg-[var(--danger-soft)] flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-[var(--danger)] flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-red-900">데이터를 불러오지 못했습니다</p>
-              <p className="text-xs text-red-700 mt-1">{error}</p>
+              <p className="text-sm font-semibold text-[var(--ink)]">데이터를 불러오지 못했습니다</p>
+              <p className="text-xs text-[var(--ink-muted)] mt-1">{error}</p>
             </div>
           </div>
         )}
 
-        {/* Results */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 text-slate-100">
+        <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-slate-100">
-              전체 매칭 결과
-              <span className="ml-2 text-2xl font-bold text-sky-200 tabular-nums" style={{ fontFamily: "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif" }}>
-                {loading ? '...' : matchedPolicies.length}
+            <h2 className="text-lg lg:text-xl font-bold text-[var(--ink)]">
+              매칭 결과{' '}
+              <span className="text-[var(--primary)] tabular-nums">
+                {loading ? '…' : matchedPolicies.length}
               </span>
-              개
+              건
             </h2>
-            <p className="text-slate-300 mt-1">
-              프로필 기준으로 조회된 전체 공고(맞춤 매칭 + 공통 공고 포함)입니다
+            <p className="text-[var(--ink-muted)] mt-1 text-sm lg:text-base">
+              맞춤 매칭과 공통 조건 공고를 포함한 전체 목록입니다
             </p>
           </div>
-          <div className="flex items-center gap-3">
-
-            <Link
-              href="/archive"
-              className="flex items-center gap-1.5 text-sm font-bold text-slate-900 bg-sky-300 px-3 py-2 rounded-full hover:bg-sky-200 transition-colors"
-            >
-              전체 공고 보러가기
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <Link href="/archive" className="btn-primary no-underline shrink-0">
+            전체 공고 보기
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
+          <div className="flex justify-center py-24">
             <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-10 h-10 text-sky-300 animate-spin" />
-              <p className="text-slate-300 font-semibold">실시간 정책 데이터를 조회하고 있습니다...</p>
+              <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
+              <p className="text-sm text-[var(--ink-muted)]">정책 데이터를 불러오는 중…</p>
             </div>
           </div>
         ) : matchedPolicies.length > 0 ? (
-          <div className="space-y-10">
+          <div className="space-y-8 lg:space-y-10">
             {matchedList.length > 0 && (
-              <div className="rounded-2xl border border-sky-300/60 bg-gradient-to-br from-sky-900/70 via-slate-900/55 to-indigo-900/70 p-5 shadow-lg ring-1 ring-sky-300/25">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <section className="section-matched">
+                <div className="section-matched-header flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h3 className="text-xl sm:text-2xl font-bold text-sky-100 drop-shadow-sm flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-sky-300" />
-                      프로필 핵심 일치 공고
+                    <h3 className="text-base lg:text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+                      <Target className="w-4 h-4 lg:w-5 lg:h-5 text-[var(--primary)] shrink-0" />
+                      프로필 일치 공고
                     </h3>
-                    <p className="text-xs text-slate-300 mt-1">지역·업종·연령 등 조건이 실제로 맞는 공고만 모았습니다</p>
+                    <p className="text-xs lg:text-sm text-[var(--ink-muted)] mt-1">
+                      지역·업종·연령 등 조건이 일치하는 공고
+                    </p>
                   </div>
-                  <span className="text-xs font-semibold text-slate-900 bg-sky-300 px-3 py-1 rounded-full">
-                    {matchedList.length}건
-                  </span>
+                  <span className="badge-count">{matchedList.length}건</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="policy-grid">
                   {matchedList.map((policy) => (
                     <PolicyCard key={policy.id} policy={policy} variant="matched" />
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
             {commonList.length > 0 && (
-              <div className="rounded-2xl border border-slate-500/40 bg-gradient-to-br from-slate-900/40 via-slate-900/20 to-slate-800/40 p-5 ring-1 ring-white/5">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <section className="section-common">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4 lg:mb-5">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-                      <Layers className="w-5 h-5 text-slate-300" />
+                    <h3 className="text-base lg:text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+                      <Layers className="w-4 h-4 lg:w-5 lg:h-5 text-[var(--ink-muted)] shrink-0" />
                       공통 공고
                     </h3>
-                    <p className="text-xs text-slate-400 mt-1">전체/전국/무관 등 공통 조건 공고</p>
+                    <p className="text-xs lg:text-sm text-[var(--ink-muted)] mt-1">
+                      전국·전체·무관 등 공통 조건 공고
+                    </p>
                   </div>
-                  <span className="text-xs font-semibold text-slate-900 bg-white/80 px-3 py-1 rounded-full border border-slate-200/80">
-                    {commonList.length}건
-                  </span>
+                  <span className="badge-count">{commonList.length}건</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="policy-grid">
                   {commonList.map((policy) => (
                     <PolicyCard key={policy.id} policy={policy} variant="common" />
                   ))}
                 </div>
-              </div>
+              </section>
             )}
           </div>
         ) : (
-          <div className="glass-card rounded-2xl p-12 text-center text-slate-900">
+          <div className="paper-card p-12 text-center">
             {error ? (
               <>
-                <p className="text-slate-800 font-bold mb-2">API 연결 상태를 확인해주세요</p>
-                <p className="text-sm text-slate-500">잠시 후 다시 시도해주시거나 관리자에게 문의하세요.</p>
+                <Database className="w-10 h-10 text-[var(--ink-muted)] mx-auto mb-3 opacity-60" />
+                <p className="text-[var(--ink)] font-semibold mb-2">API 연결 상태를 확인해주세요</p>
+                <p className="text-sm text-[var(--ink-muted)]">
+                  {error || '잠시 후 다시 시도하거나 관리자에게 문의하세요.'}
+                </p>
               </>
             ) : (
               <>
-                <p className="text-slate-600 mb-2">현재 프로필과 일치하는 정책이 없습니다</p>
-                <p className="text-sm text-slate-500">프로필 조건을 변경해보시거나 나중에 다시 조회해주세요.</p>
+                <p className="text-[var(--ink-muted)] mb-2">현재 프로필과 일치하는 정책이 없습니다</p>
+                <p className="text-sm text-[var(--ink-muted)]">
+                  프로필 조건을 변경하거나 나중에 다시 조회해주세요.
+                </p>
               </>
             )}
           </div>
         )}
       </div>
-    </div >
+    </SiteShell>
   );
 }

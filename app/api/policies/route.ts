@@ -3,6 +3,28 @@ import { NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import type { PolicyFundDB } from '@/lib/supabase/client'
 import type { Policy, PolicyDocument, PolicyRoadmapStep } from '@/lib/mockPolicies'
+import { getLocalFallbackPolicies } from '@/lib/data/localPoliciesFallback'
+import {
+    buildKStartupSearchCandidates as buildKStartupSearchCandidatesSafe,
+    extractKStartupSearchTermFromUrl,
+    isActiveKStartupPolicy,
+    isKStartupViewUrl as isKStartupViewUrlUtil,
+    resolveKStartupOfficialUrl,
+} from '@/lib/utils/kstartupUrl'
+import { extractKStartupTitleMeta } from '@/lib/utils/kstartupTitleMeta'
+import {
+    fetchBizinfoListIndex,
+    buildBizinfoDetailUrl,
+    extractBizinfoPblancId,
+    isActiveBizinfoPolicy,
+    isBizinfoSource,
+} from '@/lib/utils/bizinfoListIndex'
+import { normalizeSupportAmount } from '@/lib/utils/policyDisplay'
+import {
+    fetchKStartupListIndex,
+    lookupKStartupListEntry,
+    buildViewUrlFromEntry,
+} from '@/lib/utils/kstartupListIndex'
 export const runtime = 'edge'
 export const revalidate = 7200
 
@@ -12,77 +34,8 @@ const CACHE_HEADERS: Record<string, string> = {
 }
 
 const RESPONSE_CACHE_TTL_MS = 2 * 60 * 60 * 1000
-let responseCacheEntry: { data: string; headers: Record<string, string>; fetchedAt: number } | null = null
-
-function cleanKStartupSearchTerm(title?: string): string {
-    if (!title) return ''
-    let cleaned = sanitizePolicyTitle(title)
-    // Remove leading bracketed prefix like "[기관]" or "(기관)" or "【기관】" or "「기관」"
-    cleaned = cleaned.replace(/^\s*(?:(?:\[[^\]]+\]|\([^)]+\)|【[^】]+】|「[^」]+」)\s*)+/g, '')
-    cleaned = cleaned.replace(/\s*(?:\uC0C8\uB85C\uC6B4\uAC8C\uC2DC\uAE00|\uC0C8\s*\uAE00|\uC2E0\uADDC\s*\uAC8C\uC2DC\uAE00|\uC2E0\uADDC\s*\uAE00|NEW)\s*$/gi, '')
-    cleaned = cleaned.replace(/\s+/g, ' ').trim()
-    return cleaned
-}
-
-function extractCoreSearchPhrase(text: string): string | undefined {
-    const normalized = cleanKStartupSearchTerm(text)
-        .replace(/\([^)]*\)/g, ' ')
-        .replace(/\[[^\]]*]/g, ' ')
-        .replace(/[「」『』【】<>]/g, ' ')
-        .replace(/[~!@#$%^&*_=+|;:'",.?/\\-]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-    if (!normalized) return undefined
-
-    const stopwords = new Set([
-        '공고', '모집', '안내', '사업', '지원', '대상', '신청', '접수', '예비', '년도', '년', '및', '관련', '운영',
-    ])
-    const tokens = normalized
-        .split(' ')
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .filter((t) => !stopwords.has(t))
-
-    const priority = tokens.find((t) => /(사업|패키지|프로그램|바우처|아카데미|펀드|창업|재창업|수출)/.test(t) && t.length >= 4)
-    if (priority) {
-        const second = tokens.find((t) => t !== priority && t.length >= 2)
-        return second ? `${priority} ${second}` : priority
-    }
-
-    const longToken = tokens.find((t) => t.length >= 4)
-    if (longToken) {
-        const second = tokens.find((t) => t !== longToken && t.length >= 2)
-        return second ? `${longToken} ${second}` : longToken
-    }
-    return tokens.slice(0, 2).join(' ') || undefined
-}
-
-function buildKStartupSearchCandidates(title?: string, existingSearch?: string): string[] {
-    const cleanedTitle = cleanKStartupSearchTerm(title || '')
-    const cleanedExisting = cleanKStartupSearchTerm(existingSearch || '')
-    const withoutParen = cleanedTitle
-        .replace(/\([^)]*\)/g, ' ')
-        .replace(/\[[^\]]*]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-    const stripped = withoutParen
-        .replace(/\b20\d{2}\s*년도?\b/g, ' ')
-        .replace(/\b20\d{2}\s*년\b/g, ' ')
-        .replace(/\b(?:모집공고|모집\s*공고|모집|공고|시행계획|사업공고)\b/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-    const core = extractCoreSearchPhrase(stripped || withoutParen || cleanedTitle || cleanedExisting)
-
-    const candidates = [
-        core,
-        stripped,
-        withoutParen,
-        cleanedExisting,
-        cleanedTitle,
-    ].filter((v): v is string => Boolean(v && v.trim()))
-
-    return Array.from(new Set(candidates.map((v) => v.trim())))
-}
+const RESPONSE_CACHE_VERSION = 6
+let responseCacheEntry: { data: string; headers: Record<string, string>; fetchedAt: number; version: number } | null = null
 
 function extractAgencyFallback(title?: string, summary?: string): string | undefined {
     const t = (title || '').trim()
@@ -526,8 +479,13 @@ function sanitizePolicyTitle(raw?: string | null): string {
     cleaned = cleaned.replace(/\d{4}[-.]\d{2}[-.]\d{2}/g, '')
     cleaned = cleaned.replace(/\s+/g, ' ').trim()
 
-    const primaryMatch = cleaned.match(/(.+?(?:공고|모집|안내|선정))/)
-    if (primaryMatch?.[1]) return primaryMatch[1].trim()
+    const primaryMatch = cleaned.match(/(.+?(?:모집공고|모집\s*공고|공고|모집|안내|선정))/)
+    if (primaryMatch?.[1]) {
+        const candidate = primaryMatch[1].trim()
+        if (candidate.length >= 12 && !/^[\(\[\{「【]/.test(candidate)) {
+            return candidate
+        }
+    }
 
     const supportMatch = cleaned.match(/(.+?지원(?:사업)?)/)
     if (supportMatch?.[1]) return supportMatch[1].trim()
@@ -804,7 +762,7 @@ async function fetchMetaFromUrl(
 
         const isKStartupSource = url.toLowerCase().includes('k-startup.go.kr')
         if (isKStartupSource && /go_view\(\d+\)/.test(html)) {
-            const searchTerm = buildKStartupSearchCandidates(policyTitle || '', extractKStartupSearchTerm(url) || '')[0] || ''
+            const searchTerm = buildKStartupSearchCandidatesSafe(policyTitle || '', extractKStartupSearchTermFromUrl(url) || '')[0] || ''
             const resolvedId = extractKStartupPbancSn(html, searchTerm || policyTitle || '')
             if (resolvedId) {
                 const detailUrl = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?schM=view&pbancSn=${resolvedId}`
@@ -941,7 +899,7 @@ function extractKStartupSectionItems(html: string, sectionTitle: string): string
 }
 
 async function fetchKStartupMetaByTitle(title: string): Promise<{ roadmap: PolicyRoadmapStep[]; documents: PolicyDocument[]; resolvedUrl?: string } | null> {
-    const searchTerms = buildKStartupSearchCandidates(title)
+    const searchTerms = buildKStartupSearchCandidatesSafe(title)
     if (searchTerms.length === 0) return null
     try {
         let detailUrl: string | null = null
@@ -1273,9 +1231,52 @@ function isKStartupPolicy(policy: Policy): boolean {
 }
 
 function isKStartupViewUrl(url?: string | null): boolean {
-    if (!url) return false
-    const lower = url.toLowerCase()
-    return lower.includes('k-startup.go.kr') && (lower.includes('schm=view') || /pbancsn=\d+/.test(lower)) && !lower.includes('schm=list')
+    return isKStartupViewUrlUtil(url)
+}
+
+function enrichKStartupPolicyFromIndex(
+    policy: Policy,
+    byKey: Map<string, import('@/lib/utils/kstartupListIndex').KStartupListEntry>
+): Policy {
+    if (!isKStartupPolicy(policy)) return policy
+    if (isKStartupViewUrl(policy.url)) return policy
+
+    const entry = lookupKStartupListEntry(policy.title, byKey)
+    if (!entry) return policy
+
+    const next: Policy = { ...policy, url: buildViewUrlFromEntry(entry) }
+    if (entry.applicationPeriod) {
+        next.applicationPeriod = entry.applicationPeriod
+    }
+    if (entry.dDay != null && Number.isFinite(entry.dDay)) {
+        next.dDay = entry.dDay
+    }
+    return next
+}
+
+function enrichBizinfoPolicyFromIndex(
+    policy: Policy,
+    byPblancId: Map<string, import('@/lib/utils/bizinfoListIndex').BizinfoListEntry>
+): Policy {
+    if (!isBizinfoSource(policy.url, policy.sourcePlatform)) return policy
+
+    const pblancId = extractBizinfoPblancId(policy.url)
+    if (!pblancId) return policy
+
+    const entry = byPblancId.get(pblancId)
+    if (!entry) return policy
+
+    const next: Policy = {
+        ...policy,
+        url: buildBizinfoDetailUrl(pblancId),
+        applicationPeriod: entry.applicationPeriod,
+    }
+    if (entry.dDay != null && Number.isFinite(entry.dDay)) {
+        next.dDay = entry.dDay
+    } else if (/상시|수시|세부사업별\s*상이/i.test(entry.applicationPeriod)) {
+        next.dDay = 999
+    }
+    return next
 }
 
 function normalizeTitleKey(title: string): string {
@@ -1310,8 +1311,8 @@ function normalizeKStartupUrl(
     if (pbancSn) {
         return `${base}?schM=view&pbancSn=${pbancSn}`
     }
-    const existingSearch = extractKStartupSearchTerm(url)
-    const searchTerm = buildKStartupSearchCandidates(title, existingSearch)[0]
+    const existingSearch = extractKStartupSearchTermFromUrl(url)
+    const searchTerm = buildKStartupSearchCandidatesSafe(title, existingSearch)[0]
     if (searchTerm) {
         return `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
     }
@@ -1335,18 +1336,8 @@ function tokenizeForMatch(text: string): string[] {
         .filter((t) => t.length >= 2)
 }
 
-function extractKStartupSearchTerm(url: string): string | undefined {
-    const match = url.match(/[?&]schStr=([^&]+)/)
-    if (!match?.[1]) return undefined
-    try {
-        return decodeURIComponent(match[1].replace(/\+/g, ' ')).trim()
-    } catch {
-        return match[1]
-    }
-}
-
 function extractKStartupPbancSn(html: string, title: string): string | undefined {
-    const candidates = buildKStartupSearchCandidates(title)
+    const candidates = buildKStartupSearchCandidatesSafe(title)
     const normalizedCandidates = candidates.map((c) => normalizeForMatch(c)).filter(Boolean)
     const tokenCandidates = candidates.map((c) => tokenizeForMatch(c)).filter((tokens) => tokens.length > 0)
     const matches: Array<{ id: string; index: number }> = []
@@ -1444,8 +1435,8 @@ async function resolveKStartupDetailUrl(
         return `${base}?schM=view&pbancSn=${pbancSn}`
     }
 
-    const existingSearch = extractKStartupSearchTerm(url)
-    const candidates = buildKStartupSearchCandidates(title, existingSearch)
+    const existingSearch = extractKStartupSearchTermFromUrl(url)
+    const candidates = buildKStartupSearchCandidatesSafe(title, existingSearch)
     const fallbackUrl = candidates[0]
         ? `${base}?schM=list&schStr=${encodeURIComponent(candidates[0])}`
         : (url || base)
@@ -1486,15 +1477,24 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     const cleanedTitle = sanitizePolicyTitle(extractTitleFromHtml(dbPolicy.title) || stripHtml(dbPolicy.title))
     const cleanedSummary = cleanSummaryText(dbPolicy.content_summary || '')
     const summaryFallback = isGenericSummary(cleanedSummary) ? extractSummaryFromContent(dbPolicy.raw_content, cleanedTitle) : cleanedSummary
+    const titleMeta =
+        (sourceFromUrl || sourceFromSite || '').toLowerCase().includes('k-startup') ||
+        (dbPolicy.source_site || '').toUpperCase().includes('K-STARTUP')
+            ? extractKStartupTitleMeta(dbPolicy.title)
+            : { dDay: null, applicationPeriod: null }
     const texts = preStripTexts(dbPolicy.application_period, dbPolicy.content_summary, dbPolicy.raw_content)
     const cleanedPeriod = texts.apText
     const computedPeriod = computeApplicationPeriod(texts)
     const computedDDayRaw = computeDDay(texts)
     const computedDDay = Number.isFinite(computedDDayRaw) ? computedDDayRaw : null
-    const finalPeriod = normalizeApplicationPeriodText(computedPeriod) || normalizeApplicationPeriodText(cleanedPeriod) || '\uC0C1\uC2DC'
+    const finalPeriod =
+        normalizeApplicationPeriodText(computedPeriod) ||
+        normalizeApplicationPeriodText(cleanedPeriod) ||
+        titleMeta.applicationPeriod ||
+        '공고문 확인'
     const syncedDDay = computeDDayFromNormalizedPeriod(finalPeriod)
     const dbDdayRaw = typeof dbPolicy.d_day === 'number' && Number.isFinite(dbPolicy.d_day) ? dbPolicy.d_day : null
-    const dbDday = (dbDdayRaw !== null && dbDdayRaw >= -30 && dbDdayRaw <= 370) ? dbDdayRaw : null
+    const dbDday = dbDdayRaw !== null && dbDdayRaw >= -30 && dbDdayRaw <= 370 ? dbDdayRaw : null
     const normalizedRoadmap: PolicyRoadmapStep[] = normalizeRoadmap(dbPolicy.roadmap)
     const normalizedDocuments: PolicyDocument[] = normalizeDocuments(dbPolicy.documents)
     const roadmapFallback: PolicyRoadmapStep[] = normalizedRoadmap.length > 0
@@ -1516,12 +1516,22 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
         id: String(dbPolicy.id), // 숫자 ID를 문자열로 변환
         title: cleanedTitle || '제목 없음',
         summary: summaryFallback || '',
-        supportAmount: dbPolicy.amount || '미정',
-        dDay: syncedDDay ?? computedDDay ?? dbDday ?? 999,
+        supportAmount: normalizeSupportAmount(dbPolicy.amount) || '',
+        dDay: syncedDDay ?? computedDDay ?? titleMeta.dDay ?? dbDday ?? 999,
         applicationPeriod: finalPeriod,
-        agency: dbPolicy.agency || extractAgencyFallback(cleanedTitle, cleanedSummary) || sourcePlatform || '정부기관',
+        agency: (() => {
+            const raw = dbPolicy.agency || extractAgencyFallback(cleanedTitle, cleanedSummary) || sourcePlatform || '정부기관'
+            const text = String(raw).trim()
+            if (!text || /^(null|undefined)$/i.test(text)) return sourcePlatform || '정부기관'
+            return text
+        })(),
         sourcePlatform,
-        url: normalizeKStartupUrl(dbPolicy.link || dbPolicy.url || undefined, dbPolicy.title, dbPolicy.source_site),
+        url: resolveKStartupOfficialUrl({
+            rawUrl: dbPolicy.link || dbPolicy.url || undefined,
+            title: cleanedTitle || dbPolicy.title,
+            sourceSite: dbPolicy.source_site,
+            policyId: String(dbPolicy.id),
+        }),
         mobileUrl: dbPolicy.mobile_url || undefined,
         detailContent: dbPolicy.raw_content || undefined,
         inquiry: dbPolicy.inquiry || undefined,
@@ -1540,8 +1550,28 @@ function mapDBToUI(dbPolicy: PolicyFundDB): Policy {
     }
 }
 
+function buildPoliciesResponse(policies: Policy[]) {
+    const responseBody = JSON.stringify({
+        success: true,
+        data: policies,
+        count: policies.length,
+        error: null,
+    })
+
+    responseCacheEntry = { data: responseBody, headers: CACHE_HEADERS, fetchedAt: Date.now(), version: RESPONSE_CACHE_VERSION }
+
+    return new Response(responseBody, {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...CACHE_HEADERS },
+    })
+}
+
 export async function GET() {
-    if (responseCacheEntry && (Date.now() - responseCacheEntry.fetchedAt) < RESPONSE_CACHE_TTL_MS) {
+    if (
+        responseCacheEntry &&
+        responseCacheEntry.version === RESPONSE_CACHE_VERSION &&
+        (Date.now() - responseCacheEntry.fetchedAt) < RESPONSE_CACHE_TTL_MS
+    ) {
         return new Response(responseCacheEntry.data, {
             status: 200,
             headers: { 'Content-Type': 'application/json', ...responseCacheEntry.headers },
@@ -1551,10 +1581,8 @@ export async function GET() {
     try {
         const supabase = getSupabaseClient()
         if (!supabase) {
-            return NextResponse.json(
-                { success: false, error: 'Missing Supabase environment variables', data: [] },
-                { status: 500, headers: CACHE_HEADERS }
-            )
+            console.warn('[policies] Supabase unavailable — serving local fallback data')
+            return buildPoliciesResponse(getLocalFallbackPolicies())
         }
         // Supabase에서 모든 정책 데이터 가져오기
         const { data, error } = await supabase
@@ -1564,6 +1592,11 @@ export async function GET() {
 
         if (error) {
             console.error('Supabase error:', error)
+            const fallback = getLocalFallbackPolicies()
+            if (fallback.length > 0) {
+                console.warn('[policies] Supabase query failed — serving local fallback data')
+                return buildPoliciesResponse(fallback)
+            }
             return NextResponse.json(
                 { success: false, error: 'Failed to fetch policies from database', data: [] },
                 { status: 500, headers: CACHE_HEADERS }
@@ -1594,27 +1627,28 @@ export async function GET() {
 
         const filtered = (data as PolicyFundDB[]).filter((p) => !isTestPolicy(p) && !isInvalidKStartup(p))
 
-        // DB 데이터를 UI 타입으로 변환 + D-Day 보정
-        const policies: Policy[] = await mapWithLimit(filtered, 5, async (p) => {
+        // K-Startup / 기업마당 현재 모집 목록 인덱스
+        let kstartupIndexByKey = new Map<string, import('@/lib/utils/kstartupListIndex').KStartupListEntry>()
+        let bizinfoIndexByPblanc = new Map<string, import('@/lib/utils/bizinfoListIndex').BizinfoListEntry>()
+        try {
+            const index = await fetchKStartupListIndex()
+            kstartupIndexByKey = index.byKey
+        } catch (err) {
+            console.warn('[policies] K-Startup list index fetch failed:', err)
+        }
+        try {
+            bizinfoIndexByPblanc = await fetchBizinfoListIndex()
+        } catch (err) {
+            console.warn('[policies] Bizinfo list index fetch failed:', err)
+        }
+
+        // DB → UI 변환 + 외부 목록 메타 보강
+        const policies: Policy[] = filtered.map((p) => {
             const mapped = mapDBToUI(p)
-            const needsData =
-                mapped.roadmap.length === 0 &&
-                mapped.documents.length === 0 &&
-                (mapped.dDay === 999 || mapped.dDay == null)
-            const hasSearchUrl = mapped.url?.includes('schM=list&schStr=')
-            if ((needsData || hasSearchUrl) && mapped.url && shouldFetchDday(mapped.url)) {
-                const fetched = await fetchMetaFromUrl(mapped.url as string, mapped.title)
-                if (fetched) {
-                    if (fetched.resolvedUrl) mapped.url = fetched.resolvedUrl
-                    if (fetched.dDay !== null) mapped.dDay = fetched.dDay
-                    if (fetched.applicationPeriod) mapped.applicationPeriod = fetched.applicationPeriod
-                    const syncedDday = computeDDayFromNormalizedPeriod(mapped.applicationPeriod)
-                    if (syncedDday !== null) mapped.dDay = syncedDday
-                    if (fetched.roadmap.length > 0) mapped.roadmap = expandCommaSeparatedRoadmap(fetched.roadmap).slice(0, 12)
-                    if (fetched.documents.length > 0) mapped.documents = fetched.documents.slice(0, 12)
-                }
-            }
-            return mapped
+            return enrichBizinfoPolicyFromIndex(
+                enrichKStartupPolicyFromIndex(mapped, kstartupIndexByKey),
+                bizinfoIndexByPblanc
+            )
         })
 
         
@@ -1654,6 +1688,8 @@ export async function GET() {
             }
             return policy
         }).filter((policy) => {
+            if (!isActiveKStartupPolicy(policy)) return false
+            if (!isActiveBizinfoPolicy(policy, bizinfoIndexByPblanc)) return false
             if (!isKStartupPolicy(policy)) return true
             const key = normalizeTitleKey(policy.title)
             const pbancKey = extractKStartupPbancFromUrl(policy.url)
@@ -1663,22 +1699,15 @@ export async function GET() {
             return true
         })
 
-        const responseBody = JSON.stringify({
-            success: true,
-            data: normalizedPolicies,
-            count: normalizedPolicies.length,
-            error: null,
-        })
-
-        responseCacheEntry = { data: responseBody, headers: CACHE_HEADERS, fetchedAt: Date.now() }
-
-        return new Response(responseBody, {
-            status: 200,
-            headers: { 'Content-Type': 'application/json', ...CACHE_HEADERS },
-        })
+        return buildPoliciesResponse(normalizedPolicies)
 
     } catch (error) {
         console.error('API error:', error)
+        const fallback = getLocalFallbackPolicies()
+        if (fallback.length > 0) {
+            console.warn('[policies] Unexpected error — serving local fallback data')
+            return buildPoliciesResponse(fallback)
+        }
         return NextResponse.json(
             { success: false, error: 'Internal server error', data: [] },
             { status: 500, headers: CACHE_HEADERS }

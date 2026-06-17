@@ -46,13 +46,24 @@ export function usePolicies(profile: UserProfile, options?: { skipFiltering?: bo
             setLoading(true);
 
             try {
-                // 내 서버의 프록시 API 호출 (/api/policies)
+                const controller = new AbortController()
+                const timeoutId = setTimeout(() => controller.abort(), 90000)
                 const response = await fetch('/api/policies', {
-                    next: { revalidate: 7200 },
-                } as RequestInit);
-                const result = await response.json();
+                    signal: controller.signal,
+                    cache: 'no-store',
+                })
+                clearTimeout(timeoutId)
 
-                if (result.success && result.data) {
+                if (!response.ok) {
+                    setPolicies([])
+                    setSource('none')
+                    setError(`서버 응답 오류 (${response.status})`)
+                    return
+                }
+
+                const result = await response.json()
+
+                if (result.success && Array.isArray(result.data)) {
                     const allData = result.data.map((policy: Policy) => ({
                         ...policy,
                         title: normalizeTitle(policy.title || ''),
@@ -175,10 +186,15 @@ export function usePolicies(profile: UserProfile, options?: { skipFiltering?: bo
                     setError(result.error || null);
                 }
             } catch (err) {
-                console.error('정책 불러오기 오류:', err);
-                setPolicies([]);
-                setSource('none');
-                setError('서버 통신 오류가 발생했습니다.');
+                console.error('정책 불러오기 오류:', err)
+                setPolicies([])
+                setSource('none')
+                const isAbort = err instanceof DOMException && err.name === 'AbortError'
+                setError(
+                    isAbort
+                        ? '데이터 로드 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+                        : '서버 통신 오류가 발생했습니다.'
+                )
             } finally {
                 setLoading(false);
             }

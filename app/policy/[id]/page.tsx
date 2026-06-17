@@ -5,6 +5,8 @@ import { useUserProfileStore } from '@/lib/store';
 import { usePolicies } from '@/lib/hooks/usePolicies';
 import { getPolicySummary } from '@/lib/utils/policyCounts';
 import { ArrowLeft, TrendingUp, MapPin, FileCheck, Loader2, ExternalLink, AlertTriangle, Info } from 'lucide-react';
+import SiteShell from '@/components/SiteShell';
+import { isKStartupListSearchUrl, resolveKStartupOfficialUrl } from '@/lib/utils/kstartupUrl';
 export const runtime = 'edge'
 
 export default function PolicyDetailPage() {
@@ -31,56 +33,46 @@ export default function PolicyDetailPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden flex items-center justify-center">
-                <div className="pointer-events-none absolute inset-0 bg-[url('/bg-mesh.svg')] bg-cover opacity-70" />
-                <div className="pointer-events-none absolute inset-0 bg-[url('/texture-grid.svg')] bg-cover opacity-50 mix-blend-soft-light" />
-                <div className="text-center relative z-10">
-                    <Loader2 className="w-10 h-10 text-sky-300 animate-spin mx-auto mb-3" />
-                    <p className="text-slate-300">정책 정보를 불러오는 중입니다...</p>
+            <SiteShell centered>
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin mx-auto mb-3" />
+                    <p className="text-[var(--ink-muted)]">정책 정보를 불러오는 중…</p>
                 </div>
-            </div>
+            </SiteShell>
         );
     }
 
 
     if (!policy) {
         return (
-            <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden flex items-center justify-center p-4">
-                <div className="pointer-events-none absolute inset-0 bg-[url('/bg-mesh.svg')] bg-cover opacity-70" />
-                <div className="pointer-events-none absolute inset-0 bg-[url('/texture-grid.svg')] bg-cover opacity-50 mix-blend-soft-light" />
-                <div className="text-center p-8 glass-card rounded-2xl max-w-2xl text-slate-900 relative z-10">
-                    <h1 className="text-2xl font-bold text-slate-900 mb-2">정책을 찾을 수 없습니다</h1>
-                    <p className="text-slate-500 mb-6">
+            <SiteShell centered>
+                <div className="text-center p-8 paper-card max-w-2xl w-full">
+                    <h1 className="text-2xl font-bold mb-2">정책을 찾을 수 없습니다</h1>
+                    <p className="text-[var(--ink-muted)] mb-6">
                         요청하신 정책 ID를 찾을 수 없습니다.<br />
-                        <span className="text-xs text-slate-400">찾으려는 ID: ({decodedId})</span>
+                        <span className="text-xs">찾으려는 ID: ({decodedId})</span>
                         <br />
-                        <span className="text-xs text-slate-400 mt-2 block">
-                            전체 {policies.length}개 정책 로드됨
-                        </span>
+                        <span className="text-xs mt-2 block">전체 {policies.length}개 정책 로드됨</span>
                     </p>
 
-                    {/* 디버그 로드된 정책 ID 목록 */}
                     {policies.length > 0 && (
-                        <div className="bg-white/80 p-4 rounded-lg border border-slate-200 mb-6 text-left">
-                            <p className="text-xs font-bold text-slate-700 mb-2">디버그 로드된 정책 ID 목록</p>
-                            <ul className="text-xs text-slate-600 space-y-1">
+                        <div className="bg-[var(--paper-deep)] p-4 rounded-lg border border-[var(--line)] mb-6 text-left">
+                            <p className="text-xs font-bold mb-2">디버그: 로드된 정책 ID</p>
+                            <ul className="text-xs text-[var(--ink-muted)] space-y-1">
                                 {policies.slice(0, 5).map(p => (
                                     <li key={p.id} className="font-mono">
-                                        ID: "{p.id}" - {p.title.substring(0, 30)}...
+                                        ID: &quot;{p.id}&quot; - {p.title.substring(0, 30)}…
                                     </li>
                                 ))}
                             </ul>
                         </div>
                     )}
 
-                    <button
-                        onClick={() => router.push('/')}
-                        className="px-6 py-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors font-semibold"
-                    >
+                    <button onClick={() => router.push('/')} className="btn-primary">
                         홈으로 돌아가기
                     </button>
                 </div>
-            </div>
+            </SiteShell>
         );
     }
 
@@ -137,30 +129,13 @@ export default function PolicyDetailPage() {
     }
 
     const summaryItems = splitSummaryItems(getPolicySummary(policy.summary, policy.detailContent))
-    const normalizeKStartupSearchTerm = (value: string) =>
-        value
-            .replace(/^\s*(?:\[[^\]]+\]|\([^)]+\)|【[^】]+】)\s*/g, '')
-            .replace(/[^\uAC00-\uD7A3A-Za-z0-9\s]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-
-    const getOfficialUrl = (url?: string, title?: string) => {
-        if (!url) return undefined
-        const lower = url.toLowerCase()
-        if (!lower.includes('k-startup.go.kr')) return url
-
-        const base = 'https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do'
-        const pbancMatch = url.match(/pbancSn=(\d+)/i)
-        if (pbancMatch?.[1]) return `${base}?schM=view&pbancSn=${pbancMatch[1]}`
-
-        const goViewMatch = url.match(/go_view(?:_blank)?\((\d+)\)/i)
-        if (goViewMatch?.[1]) return `${base}?schM=view&pbancSn=${goViewMatch[1]}`
-
-        const searchMatch = url.match(/[?&]schStr=([^&]+)/i)
-        const decodedSearch = searchMatch?.[1] ? decodeURIComponent(searchMatch[1].replace(/\+/g, ' ')) : ''
-        const searchTerm = normalizeKStartupSearchTerm(title || decodedSearch)
-        if (!searchTerm) return base
-        return `${base}?schM=list&schStr=${encodeURIComponent(searchTerm)}`
+    const getOfficialUrl = (url?: string, title?: string, policyId?: string) => {
+        return resolveKStartupOfficialUrl({
+            rawUrl: url,
+            title,
+            sourceSite: policy?.sourcePlatform,
+            policyId,
+        })
     }
 
     const extractSupportAmountFromDetail = (html?: string) => {
@@ -180,7 +155,8 @@ export default function PolicyDetailPage() {
         return ''
     }
 
-    const officialUrl = getOfficialUrl(policy.url, policy.title)
+    const officialUrl = getOfficialUrl(policy.url, policy.title, policy.id)
+    const officialUrlIsSearchOnly = Boolean(officialUrl && isKStartupListSearchUrl(officialUrl))
     const supportAmountForDisplay =
         policy.supportAmount && !/^(null|undefined|\s*|미정)$/i.test(policy.supportAmount)
             ? policy.supportAmount
@@ -194,98 +170,90 @@ export default function PolicyDetailPage() {
     const isUnknownDDay = policy.dDay === 999 || policy.dDay == null;
     const isExpired = !isUnknownDDay && policy.dDay < 0;
     const dDayLabel = isAlwaysOpen ? '상시모집' : isUnknownDDay ? null : isExpired ? '마감' : policy.dDay === 0 ? 'D-Day' : `D-${policy.dDay}`;
-    const dDayColor = isAlwaysOpen ? 'bg-green-100 text-green-700' : isExpired ? 'bg-slate-200 text-slate-500' : (policy.dDay <= 7 ? 'bg-red-100 text-red-600' : policy.dDay <= 30 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700');
+    const dDayColor = isAlwaysOpen ? 'badge-dday-open' : isExpired || isUnknownDDay ? 'badge-dday-muted' : (policy.dDay <= 7 ? 'badge-dday-urgent' : policy.dDay <= 30 ? 'badge-dday-warn' : 'badge-dday-normal');
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
-            <div className="pointer-events-none absolute inset-0 bg-[url('/bg-mesh.svg')] bg-cover opacity-70" />
-            <div className="pointer-events-none absolute inset-0 bg-[url('/texture-grid.svg')] bg-cover opacity-50 mix-blend-soft-light" />
-            {/* Header */}
-            <header className="sticky top-0 z-20 glass-dark">
-                <div className="max-w-4xl mx-auto px-4 py-4">
-                    <button
-                        onClick={() => router.back()}
-                        className="flex items-center gap-2 text-slate-100 bg-slate-800/70 border border-slate-600/40 px-3 py-1.5 rounded-full hover:bg-slate-700/70 hover:text-white transition-colors mb-2"
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                        <span className="font-semibold">뒤로가기</span>
+        <SiteShell>
+            <header className="site-header">
+                <div className="site-container max-w-5xl py-4 lg:py-5">
+                    <button onClick={() => router.back()} className="btn-ghost mb-3 text-sm">
+                        <ArrowLeft className="w-4 h-4" />
+                        뒤로가기
                     </button>
-                    <h1 className="text-2xl font-bold text-slate-100 leading-tight">{policy.title}</h1>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 bg-slate-900/60 text-slate-100 px-2 py-1 rounded text-xs font-bold border border-slate-700/60">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold leading-snug">{policy.title}</h1>
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                        <span className="inline-flex items-center gap-1.5 bg-[var(--surface-sunken)] px-2 py-1 rounded text-xs font-medium border border-[var(--line)]">
                             <img src={source.logo} alt={source.label} className="w-4 h-4" />
                             {source.label}
                         </span>
                         {policy.agency && policy.agency !== '정부기관' && policy.agency !== source.label && (
-                            <span className="bg-sky-300 text-slate-900 px-2 py-1 rounded text-xs font-bold border border-sky-200">
+                            <span className="bg-[var(--primary-soft)] text-[var(--primary)] px-2 py-1 rounded text-xs font-medium border border-[rgba(30,64,175,0.15)]">
                                 {policy.agency}
                             </span>
                         )}
                         {dDayLabel && (
-                            <span className={`${dDayColor} px-2 py-1 rounded text-xs font-bold`}>{dDayLabel}</span>
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${dDayColor}`}>{dDayLabel}</span>
                         )}
                     </div>
                 </div>
             </header>
 
-            <div className="max-w-4xl mx-auto px-4 py-6 space-y-6 relative z-10">
+            <div className="site-container max-w-5xl py-6 lg:py-8 space-y-6 lg:space-y-8 pb-12">
 
-                {/* 1. Official Source Link (Top Priority) */}
                 {officialUrl && (
-                    <div className="glass-card rounded-2xl p-6 text-slate-900">
+                    <div className="paper-card p-5 sm:p-6">
                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 shrink-0">
-                                    <FileCheck className="w-6 h-6 text-white" />
+                            <div className="flex items-start gap-3">
+                                <div className="p-2.5 rounded-lg bg-[var(--primary)] shrink-0">
+                                    <FileCheck className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                        공고 원문 확인하기
-                                        <span className="bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm align-middle">OFFICIAL</span>
-                                    </h2>
-                                    <p className="text-sm text-slate-600 mt-1">
-                                        정확한 정보 확인과 신청은 <strong>{policy.agency || '정부'} 공식 사이트</strong>에서 진행해주세요.
+                                    <h2 className="text-base font-bold">공고 원문 확인</h2>
+                                    <p className="text-sm text-[var(--ink-muted)] mt-1">
+                                        {officialUrlIsSearchOnly ? (
+                                            <>
+                                                이 공고는 K-Startup에 직접 연결되는 원문 URL이 없어{' '}
+                                                <strong className="text-[var(--ink-secondary)]">유사 키워드 검색</strong>
+                                                으로 안내됩니다. 검색 결과에 해당 공고가 없을 수 있습니다.
+                                            </>
+                                        ) : (
+                                            <>
+                                                정확한 정보 확인과 신청은{' '}
+                                                <strong className="text-[var(--ink-secondary)]">{policy.agency || '정부'} 공식 사이트</strong>
+                                                에서 진행해주세요.
+                                            </>
+                                        )}
                                     </p>
                                 </div>
                             </div>
-                            <a
-                                href={officialUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-sky-300 hover:bg-sky-200 text-slate-900 rounded-full font-bold transition-all shadow-md hover:shadow-lg whitespace-nowrap"
-                            >
-                                공고문 보러가기
+                            <a href={officialUrl} target="_blank" rel="noopener noreferrer" className="btn-primary w-full sm:w-auto whitespace-nowrap no-underline">
+                                {officialUrlIsSearchOnly ? 'K-Startup에서 검색' : '공고문 보러가기'}
                                 <ExternalLink className="w-4 h-4" />
                             </a>
                         </div>
                     </div>
                 )}
 
-                {/* Detailed Content (Simulated HWP View) */}
                 {policy.detailContent && (
-                    <div className="glass-card rounded-2xl p-6 text-slate-900">
-                        <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                            <Info className="w-5 h-5 text-sky-600" />
-                            공고 핵심 내용 (텍스트 미리보기)
+                    <div className="paper-card p-5 sm:p-6">
+                        <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                            <Info className="w-4 h-4 text-[var(--primary)]" />
+                            공고 핵심 내용
                         </h2>
-                        <div
-                            className="prose prose-sm max-w-none text-slate-700 space-y-2 [&>h3]:text-blue-800 [&>h3]:font-bold [&>h3]:mt-4 [&>h3]:mb-2 [&>h3]:text-base [&>p]:leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: policy.detailContent }}
-                        />
-                        <p className="text-xs text-slate-400 mt-6 pt-4 border-t border-slate-100">
+                        <div className="prose-policy max-w-none space-y-2" dangerouslySetInnerHTML={{ __html: policy.detailContent }} />
+                        <p className="text-xs text-[var(--ink-muted)] mt-6 pt-4 border-t border-[var(--line)]">
                             * 본 내용은 공고문 원본(HWP/PDF) 내용을 기반으로 정리된 요약/미리보기입니다. 반드시 원본 파일을 다운로드하여 확인하시기 바랍니다.
                         </p>
                     </div>
                 )}
 
-                {/* 2. Key Information Summary */}
-                <div className="glass-card rounded-2xl p-6 text-slate-900">
-                    <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-sky-600" />
+                <div className="paper-card p-5 sm:p-6">
+                    <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-[var(--primary)]" />
                         주요 정보 요약
                     </h2>
                     {summaryItems.length > 0 ? (
-                        <ul className="list-disc pl-5 space-y-1 text-slate-700">
+                        <ul className="list-disc pl-5 space-y-1 text-[var(--ink-muted)]">
                             {summaryItems.map((item, index) => (
                                 <li key={`${item}-${index}`} className="leading-relaxed">
                                     {item}
@@ -293,21 +261,16 @@ export default function PolicyDetailPage() {
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-slate-500">요약 정보가 없습니다.</p>
+                        <p className="text-[var(--ink-muted)]">요약 정보가 없습니다.</p>
                     )}
-                    <p className="text-xs text-slate-400 mt-2 mb-6 text-right">출처: {policy.agency}</p>
+                    <p className="text-xs text-[var(--ink-muted)] mt-2 mb-6 text-right">출처: {policy.agency}</p>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="bg-white/80 p-4 rounded-lg border border-slate-100">
-                            <p className="text-xs text-slate-500 font-bold mb-1">지원 내용</p>
-                            <p className="font-semibold text-slate-900">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-[var(--surface-sunken)] p-4 rounded-lg border border-[var(--line)]">
+                            <p className="text-xs text-[var(--ink-muted)] font-medium mb-1">지원 내용</p>
+                            <p className="font-semibold text-sm">
                                 {officialUrl ? (
-                                    <a
-                                        href={officialUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sky-600 hover:text-sky-700 hover:underline flex items-center gap-1 transition-colors"
-                                    >
+                                    <a href={officialUrl} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline inline-flex items-center gap-1">
                                         {supportAmountForDisplay}
                                         <ExternalLink className="w-3 h-3" />
                                     </a>
@@ -316,46 +279,40 @@ export default function PolicyDetailPage() {
                                 )}
                             </p>
                         </div>
-                        <div className="bg-white/80 p-4 rounded-lg border border-slate-100">
-                            <p className="text-xs text-slate-500 font-bold mb-1">신청 기간</p>
-                            <p className="font-semibold text-slate-900">
-                                {applicationPeriodForDisplay}
-                            </p>
+                        <div className="bg-[var(--surface-sunken)] p-4 rounded-lg border border-[var(--line)]">
+                            <p className="text-xs text-[var(--ink-muted)] font-medium mb-1">신청 기간</p>
+                            <p className="font-semibold text-sm">{applicationPeriodForDisplay}</p>
                         </div>
 
-                        {/* 소관기관 */}
-                        <div className="bg-white/80 p-4 rounded-lg border border-slate-100">
-                            <p className="text-xs text-slate-500 font-bold mb-1">소관기관</p>
-                            <p className="font-semibold text-slate-900">{policy.agency}</p>
+                        <div className="bg-[var(--surface-sunken)] p-4 rounded-lg border border-[var(--line)]">
+                            <p className="text-xs text-[var(--ink-muted)] font-medium mb-1">소관기관</p>
+                            <p className="font-semibold text-sm">{policy.agency}</p>
                         </div>
 
-                        {/* 신청방법 */}
                         {policy.applicationMethod && (
-                            <div className="bg-white/80 p-4 rounded-lg border border-slate-100">
-                                <p className="text-xs text-slate-500 font-bold mb-1">신청방법</p>
-                                <p className="font-semibold text-slate-900">{policy.applicationMethod}</p>
+                            <div className="bg-[var(--surface-sunken)] p-4 rounded-lg border border-[var(--line)]">
+                                <p className="text-xs text-[var(--ink-muted)] font-medium mb-1">신청방법</p>
+                                <p className="font-semibold text-sm">{policy.applicationMethod}</p>
                             </div>
                         )}
 
-                        {/* 문의처 */}
                         {policy.inquiry && (
-                            <div className="bg-white/80 p-4 rounded-lg border border-slate-100 sm:col-span-2">
-                                <p className="text-xs text-slate-500 font-bold mb-1">문의처</p>
-                                <p className="font-semibold text-slate-900">{policy.inquiry}</p>
+                            <div className="bg-[var(--surface-sunken)] p-4 rounded-lg border border-[var(--line)] sm:col-span-2">
+                                <p className="text-xs text-[var(--ink-muted)] font-medium mb-1">문의처</p>
+                                <p className="font-semibold text-sm">{policy.inquiry}</p>
                             </div>
                         )}
                     </div>
 
-                    {/* 지역 정보 */}
                     {policy.criteria?.regions && policy.criteria.regions.length > 0 && (
-                        <div className="mt-4 bg-sky-50/80 p-4 rounded-lg border border-sky-100">
-                            <p className="text-xs text-sky-700 font-bold mb-2 flex items-center gap-1">
+                        <div className="mt-4 bg-[var(--success-soft)] p-4 rounded-lg border border-[rgba(5,150,105,0.15)]">
+                            <p className="text-xs text-[var(--success)] font-semibold mb-2 flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />
                                 지원 대상 지역
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 {policy.criteria.regions.map((region, idx) => (
-                                    <span key={idx} className="px-2 py-1 bg-white text-sky-700 text-xs font-bold rounded-md border border-sky-200">
+                                    <span key={idx} className="px-2 py-1 bg-[var(--surface-raised)] text-[var(--success)] text-xs font-medium rounded border border-[rgba(5,150,105,0.2)]">
                                         {region}
                                     </span>
                                 ))}
@@ -366,19 +323,19 @@ export default function PolicyDetailPage() {
 
                 {/* 3. Support Criteria (지원 대상 조건) */}
                 {(policy.criteria?.entityTypes?.length || policy.criteria?.industries?.length || policy.criteria?.ageGroups?.length || policy.criteria?.businessPeriods?.length) ? (
-                    <div className="glass-card rounded-2xl p-6 text-slate-900">
-                        <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                            <FileCheck className="w-5 h-5 text-blue-600" />
+                    <div className="paper-card p-5 sm:p-6">
+                        <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                            <FileCheck className="w-4 h-4 text-[var(--primary)]" />
                             지원 대상 조건
                         </h2>
 
                         <div className="space-y-4">
                             {policy.criteria.entityTypes && policy.criteria.entityTypes.length > 0 && (
                                 <div>
-                                    <p className="text-sm font-bold text-slate-700 mb-2">기업 유형</p>
+                                    <p className="text-sm font-semibold mb-2 text-[var(--ink-secondary)]">기업 유형</p>
                                     <div className="flex flex-wrap gap-2">
                                         {policy.criteria.entityTypes.map((type, idx) => (
-                                            <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 text-sm font-semibold rounded-lg border border-blue-100">
+                                            <span key={idx} className="px-2.5 py-1 bg-[var(--primary-soft)] text-[var(--primary)] text-sm font-medium rounded border border-[rgba(30,64,175,0.15)]">
                                                 {type}
                                             </span>
                                         ))}
@@ -388,10 +345,10 @@ export default function PolicyDetailPage() {
 
                             {policy.criteria.industries && policy.criteria.industries.length > 0 && (
                                 <div>
-                                    <p className="text-sm font-bold text-slate-700 mb-2">업종</p>
+                                    <p className="text-sm font-semibold mb-2 text-[var(--ink-secondary)]">업종</p>
                                     <div className="flex flex-wrap gap-2">
                                         {policy.criteria.industries.map((industry, idx) => (
-                                            <span key={idx} className="px-3 py-1 bg-green-50 text-green-700 text-sm font-semibold rounded-lg border border-green-100">
+                                            <span key={idx} className="px-2.5 py-1 bg-[var(--success-soft)] text-[var(--success)] text-sm font-medium rounded border border-[rgba(5,150,105,0.15)]">
                                                 {industry}
                                             </span>
                                         ))}
@@ -401,10 +358,10 @@ export default function PolicyDetailPage() {
 
                             {policy.criteria.ageGroups && policy.criteria.ageGroups.length > 0 && (
                                 <div>
-                                    <p className="text-sm font-bold text-slate-700 mb-2">연령대</p>
+                                    <p className="text-sm font-semibold mb-2 text-[var(--ink-secondary)]">연령대</p>
                                     <div className="flex flex-wrap gap-2">
                                         {policy.criteria.ageGroups.map((age, idx) => (
-                                            <span key={idx} className="px-3 py-1 bg-purple-50 text-purple-700 text-sm font-semibold rounded-lg border border-purple-100">
+                                            <span key={idx} className="px-2.5 py-1 bg-[var(--surface-sunken)] text-[var(--ink-secondary)] text-sm font-medium rounded border border-[var(--line)]">
                                                 {age}
                                             </span>
                                         ))}
@@ -414,10 +371,10 @@ export default function PolicyDetailPage() {
 
                             {policy.criteria.businessPeriods && policy.criteria.businessPeriods.length > 0 && (
                                 <div>
-                                    <p className="text-sm font-bold text-slate-700 mb-2">사업 기간</p>
+                                    <p className="text-sm font-semibold mb-2 text-[var(--ink-secondary)]">사업 기간</p>
                                     <div className="flex flex-wrap gap-2">
                                         {policy.criteria.businessPeriods.map((period, idx) => (
-                                            <span key={idx} className="px-3 py-1 bg-orange-50 text-orange-700 text-sm font-semibold rounded-lg border border-orange-100">
+                                            <span key={idx} className="px-2.5 py-1 bg-[var(--surface-sunken)] text-[var(--ink-secondary)] text-sm font-medium rounded border border-[var(--line)]">
                                                 {period}
                                             </span>
                                         ))}
@@ -429,8 +386,8 @@ export default function PolicyDetailPage() {
                 ) : null}
 
                 {/* 주의사항 */}
-                <div className="flex items-start gap-3 bg-amber-50/90 border border-amber-200 p-4 rounded-2xl text-sm text-amber-900">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 bg-[var(--warning-soft)] border border-[rgba(180,83,9,0.2)] p-4 rounded-lg text-sm">
+                    <AlertTriangle className="w-5 h-5 text-[var(--warning)] shrink-0 mt-0.5" />
                     <div>
                         <span className="font-bold block mb-1">{disclaimerTitle}</span>
                         {disclaimerLine1}
@@ -447,6 +404,6 @@ export default function PolicyDetailPage() {
 
 
             </div>
-        </div>
+        </SiteShell>
     );
 }

@@ -10,7 +10,7 @@ interface EditableTagProps {
     value: string;
     options: string[];
     onChange: (value: string) => void;
-    color?: 'blue' | 'slate';
+    color?: 'gold' | 'seal';
     openId?: string | null;
     setOpenId?: (id: string | null) => void;
 }
@@ -21,7 +21,7 @@ export default function EditableTag({
     value,
     options,
     onChange,
-    color = 'slate',
+    color = 'gold',
     openId,
     setOpenId,
 }: EditableTagProps) {
@@ -31,9 +31,8 @@ export default function EditableTag({
     const buttonRef = useRef<HTMLButtonElement>(null);
     const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
-    const colorClasses = color === 'blue'
-        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-        : 'bg-slate-100 text-slate-700 hover:bg-slate-200';
+    const colorClasses =
+        color === 'seal' ? 'tag-editable tag-editable-seal' : 'tag-editable';
 
     const close = () => {
         if (isControlled) {
@@ -81,35 +80,42 @@ export default function EditableTag({
             <button
                 ref={buttonRef}
                 onClick={toggle}
-                className={`px-3 py-1 ${colorClasses} rounded-full text-sm font-semibold cursor-pointer transition-all flex items-center gap-1 hover:shadow-md`}
+                type="button"
+                className={`${colorClasses} cursor-pointer transition-all flex items-center gap-1 hover:shadow-md`}
             >
-                {label && `${label}: `}{value}
-                <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                {label && `${label}: `}
+                {value}
+                <ChevronDown className={`w-3 h-3 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {isOpen && (
+            {isOpen &&
                 createPortal(
                     <>
-                        {/* Backdrop */}
-                        <div
-                            className="fixed inset-0 z-[999]"
-                            onClick={close}
-                        />
+                        <div className="fixed inset-0 z-[999]" onClick={close} aria-hidden />
 
-                        {/* Dropdown */}
                         <div
-                            className="fixed bg-white rounded-lg shadow-xl border-2 border-slate-200 py-2 z-[1000] max-h-[300px] overflow-y-auto"
-                            style={{ top: dropdownPos.top, left: dropdownPos.left, minWidth: dropdownPos.width, width: 'auto', maxWidth: 260 }}
+                            className="fixed rounded-lg shadow-[var(--shadow)] border border-[var(--line)] py-1 z-[1000] max-h-[300px] overflow-y-auto bg-[var(--surface-raised)]"
+                            style={{
+                                top: dropdownPos.top,
+                                left: dropdownPos.left,
+                                minWidth: dropdownPos.width,
+                                width: 'auto',
+                                maxWidth: 260,
+                            }}
                         >
                             {options.map((option) => (
                                 <button
                                     key={option}
+                                    type="button"
                                     onClick={() => {
                                         onChange(option);
                                         close();
                                     }}
-                                    className={`w-full px-4 py-2 text-left text-sm whitespace-normal hover:bg-blue-50 transition-colors ${option === value ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-slate-700'
-                                        }`}
+                                    className={`w-full px-3 py-2 text-left text-sm whitespace-normal transition-colors hover:bg-[var(--surface-sunken)] ${
+                                        option === value
+                                            ? 'bg-[var(--primary-soft)] text-[var(--primary)] font-semibold'
+                                            : 'text-[var(--ink)]'
+                                    }`}
                                 >
                                     {option}
                                 </button>
@@ -117,8 +123,7 @@ export default function EditableTag({
                         </div>
                     </>,
                     document.body
-                )
-            )}
+                )}
         </div>
     );
 }
